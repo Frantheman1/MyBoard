@@ -19,6 +19,7 @@ export interface Board {
   id: string;
   title: string;
   organizationId: string;
+  finishedAt?: string;
   createdAt: string;
   createdBy: string;
 }
@@ -40,9 +41,44 @@ export interface Task {
   columnId: string;
   boardId: string;
   completed: boolean;
+  completedAt?: string;
   createdAt: string;
   createdBy: string;
   completedBy?: string;
+}
+
+// Snapshots
+export interface BoardSnapshot {
+  id: string;
+  boardId: string;
+  organizationId: string;
+  title: string;
+  finishedOn: string; // UTC date, YYYY-MM-DD
+  createdAt: string;
+  submittedBy?: string;
+  submissionType?: 'user' | 'admin_finish';
+}
+
+export interface ColumnSnapshot {
+  id: string;
+  boardSnapshotId: string;
+  title: string;
+  position: number;
+  originalColumnId: string;
+}
+
+export interface TaskSnapshot {
+  id: string;
+  boardSnapshotId: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  dueDate?: string;
+  dueTime?: string;
+  completedAt?: string;
+  completedBy?: string;
+  originalColumnId: string;
+  originalTaskId: string;
 }
 
 export interface Notification {
@@ -67,11 +103,12 @@ export interface RootStackParamList {
   Main: undefined;
   Board: { boardId: string };
   Settings: undefined;
+  Snapshot: { snapshotId: string };
 }
 
 export interface MainTabParamList {
   Dashboard: undefined;
-  Notifications: undefined;
+  Admin: undefined;
   Profile: undefined;
 }
 

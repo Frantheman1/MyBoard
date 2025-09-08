@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Column, Task } from '../../types';
 import { supabase } from '../../../lib/supabase';
+import AnimatedTitle from '../../../components/AnimatedTitle';
 import {
   getBoardById,
   getColumnsByBoardId,
@@ -21,6 +22,8 @@ import {
   deleteBoard,
   updateTask,
   resetColumnTasks,
+  snapshotBoardAndReset,
+  snapshotColumnAndReset,
 } from '../../utils/storage';
 
 type BoardRouteProp = RouteProp<{ Board: { boardId: string } }, 'Board'>;
@@ -38,6 +41,7 @@ export default function BoardScreen() {
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [newTaskTitleByColumn, setNewTaskTitleByColumn] = useState<Record<string, string>>({});
   const [taskModalColumnId, setTaskModalColumnId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
@@ -72,6 +76,27 @@ export default function BoardScreen() {
       const d = new Date(iso);
       return isNaN(d.getTime()) ? iso : d.toLocaleDateString('nb-NO');
     } catch { return iso; }
+  };
+
+  const formatISOToInput = (iso?: string): string => {
+    if (!iso) return '';
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const [, y, mo, d] = m;
+      return `${d}-${mo}-${y}`;
+    }
+    return '';
+  };
+
+  const formatTimeFromISO = (iso?: string): string => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    } catch { return ''; }
   };
 
   const isAdmin = user?.role === 'admin';
@@ -133,12 +158,12 @@ export default function BoardScreen() {
   const handleRenameColumn = async (columnId: string) => {
     if (!isAdmin) return;
     Alert.prompt(
-      'Rename Column',
+      t.board.editColumnTitle,
       '',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Save',
+          text: t.common.save,
           onPress: async (text) => {
             if (text?.trim()) {
               await renameColumn(columnId, text.trim());
@@ -154,9 +179,9 @@ export default function BoardScreen() {
   const handleDeleteColumn = async (columnId: string) => {
     if (!isAdmin) return;
     Alert.alert('Delete Column', 'This will remove the column and its tasks.', [
-      { text: 'Cancel', style: 'cancel' },
+      { text: t.common.cancel, style: 'cancel' },
       {
-        text: 'Delete',
+        text: t.common.delete,
         style: 'destructive',
         onPress: async () => {
           await deleteColumn(columnId);
@@ -169,21 +194,21 @@ export default function BoardScreen() {
   const openEditColumn = (columnId: string) => {
     if (!isAdmin) return;
     Alert.alert(
-      'Edit Column',
+      t.board.editColumnTitle,
       undefined,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Rename', onPress: () => handleRenameColumn(columnId) },
-        { text: 'Reset tasks to not done', onPress: async () => {
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.board.rename, onPress: () => handleRenameColumn(columnId) },
+        { text: t.board.resetTasks, onPress: async () => {
             try {
               await resetColumnTasks(columnId);
               await load();
             } catch (e: any) {
-              Alert.alert('Error', e?.message || 'Unable to reset tasks');
+              Alert.alert(t.common.error, e?.message || 'Unable to reset tasks');
             }
           }
         },
-        { text: 'Delete', style: 'destructive', onPress: () => handleDeleteColumn(columnId) },
+        { text: t.common.delete, style: 'destructive', onPress: () => handleDeleteColumn(columnId) },
       ]
     );
   };
@@ -203,19 +228,32 @@ export default function BoardScreen() {
 
   const openTaskModal = (columnId: string) => {
     setTaskModalColumnId(columnId);
+    setEditingTaskId(null);
     setTaskTitle('');
     setTaskDescription('');
     setTaskDueDate('');
     setTaskDueTime('');
   };
 
-  const closeTaskModal = () => setTaskModalColumnId(null);
+  const closeTaskModal = () => {
+    setTaskModalColumnId(null);
+    setEditingTaskId(null);
+  };
+
+  const openEditTask = (task: Task) => {
+    setEditingTaskId(task.id);
+    setTaskModalColumnId(task.columnId); // reuse same modal visibility
+    setTaskTitle(task.title);
+    setTaskDescription(task.description || '');
+    setTaskDueDate(formatISOToInput(task.dueDate));
+    setTaskDueTime(task.dueTime || '');
+  };
 
   const handleCreateTaskAdvanced = async () => {
     if (!user || !taskModalColumnId) return;
     const title = taskTitle.trim();
     if (!title) {
-      Alert.alert('Title required', 'Please enter a task title');
+      Alert.alert(t.board.titleRequiredTitle, t.board.titleRequiredMessage);
       return;
     }
     try {
@@ -232,7 +270,30 @@ export default function BoardScreen() {
       await load();
     } catch (e: any) {
       console.error('Create task (advanced) error:', e);
-      Alert.alert('Error', e?.message || 'Unable to create task');
+      Alert.alert(t.common.error, e?.message || 'Unable to create task');
+    }
+  };
+
+  const handleSaveTaskEdit = async () => {
+    if (!editingTaskId) return;
+    const title = taskTitle.trim();
+    if (!title) {
+      Alert.alert(t.board.titleRequiredTitle, t.board.titleRequiredMessage);
+      return;
+    }
+    try {
+      await updateTask(editingTaskId, {
+        title,
+        description: taskDescription.trim() || undefined,
+        dueDate: parseDateInputToISO(taskDueDate) || undefined,
+        dueTime: taskDueTime || undefined,
+      });
+      setEditingTaskId(null);
+      setTaskModalColumnId(null);
+      await load();
+    } catch (e: any) {
+      console.error('Edit task error:', e);
+      Alert.alert(t.common.error, e?.message || 'Unable to save task');
     }
   };
 
@@ -260,12 +321,12 @@ export default function BoardScreen() {
   const handleRenameBoard = async () => {
     if (!isAdmin) return;
     Alert.prompt(
-      'Rename Board',
+      t.board.renameBoardTitle,
       '',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Save',
+          text: t.common.save,
           onPress: async (text) => {
             if (text?.trim()) {
               try {
@@ -274,7 +335,7 @@ export default function BoardScreen() {
                 await load();
               } catch (e: any) {
                 console.error('Rename board error:', e);
-                Alert.alert('Error', e?.message || 'Unable to rename board');
+                Alert.alert(t.common.error, e?.message || 'Unable to rename board');
               }
             }
           },
@@ -287,10 +348,10 @@ export default function BoardScreen() {
 
   const handleDeleteBoard = async () => {
     if (!isAdmin) return;
-    Alert.alert('Delete Board', 'This will remove the board and all its columns and tasks.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t.dashboard.deleteBoardTitle, t.dashboard.deleteBoardMessage, [
+      { text: t.common.cancel, style: 'cancel' },
       {
-        text: 'Delete',
+        text: t.common.delete,
         style: 'destructive',
         onPress: async () => {
           try {
@@ -298,7 +359,7 @@ export default function BoardScreen() {
             navigation.goBack();
           } catch (e: any) {
             console.error('Delete board error:', e);
-            Alert.alert('Error', e?.message || 'Unable to delete board');
+            Alert.alert(t.common.error, e?.message || 'Unable to delete board');
           }
         }
       }
@@ -311,14 +372,14 @@ export default function BoardScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
           <Text style={styles.headerBackIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{boardTitle}</Text>
+        <AnimatedTitle text={boardTitle} style={styles.headerTitle} />
         {isAdmin && (
           <View style={{ flexDirection: 'row', gap: 16 }}>
             <TouchableOpacity onPress={handleRenameBoard}>
-              <Text style={styles.headerAction}>Edit</Text>
+              <Text style={styles.headerAction}>{t.common.edit}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteBoard}>
-              <Text style={styles.headerActionDanger}>Delete</Text>
+              <Text style={styles.headerActionDanger}>{t.common.delete}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -344,24 +405,24 @@ export default function BoardScreen() {
               </View>
               {isAdmin && (
                 <TouchableOpacity onPress={() => openEditColumn(col.id)}>
-                  <Text style={styles.columnAction}>Edit</Text>
+                  <Text style={styles.columnAction}>{t.common.edit}</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {(tasksByColumn[col.id] || []).length === 0 && (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyCardTitle}>No tasks</Text>
+                <Text style={styles.emptyCardTitle}>{t.board.noTasks}</Text>
                 {isAdmin ? (
-                  <Text style={styles.emptyCardSub}>Add a task to get started</Text>
+                  <Text style={styles.emptyCardSub}>{t.board.emptyAdminHint}</Text>
                 ) : (
-                  <Text style={styles.emptyCardSub}>Waiting for your admin to add tasks</Text>
+                  <Text style={styles.emptyCardSub}>{t.board.emptyEmployeeHint}</Text>
                 )}
               </View>
             )}
 
             {(tasksByColumn[col.id] || []).map(task => (
-              <View key={task.id} style={[styles.taskCard, task.completed && styles.taskCardDone]}>
+              <TouchableOpacity key={task.id} activeOpacity={0.8} onPress={() => openEditTask(task)} style={[styles.taskCard, task.completed && styles.taskCardDone]}>
                 <View style={styles.taskContentRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.taskTitle, task.completed && styles.taskTitleDone]} numberOfLines={2}>
@@ -385,15 +446,15 @@ export default function BoardScreen() {
                 <View style={styles.taskActionsRow}>
                   <TouchableOpacity onPress={() => handleToggleDone(task.id, !task.completed)} style={[styles.actionBtn, task.completed ? styles.actionDone : styles.actionPrimary]}>
                     <Text style={[styles.actionBtnText, task.completed ? styles.actionDoneText : undefined]}>
-                      {task.completed ? 'Done' : 'Mark done'}
+                      {task.completed ? t.board.done : t.board.markDone}
                     </Text>
                   </TouchableOpacity>
                   {isAdmin && (
-                    <TouchableOpacity onPress={() => Alert.alert('Delete Task', 'Remove this task?', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteTask(task.id); await load(); } }
+                    <TouchableOpacity onPress={() => Alert.alert(t.board.deleteTaskTitle, t.board.deleteTaskMessage, [
+                      { text: t.common.cancel, style: 'cancel' },
+                      { text: t.common.delete, style: 'destructive', onPress: async () => { await deleteTask(task.id); await load(); } }
                     ])} style={[styles.actionBtn, styles.actionDanger]}>
-                      <Text style={[styles.actionBtnText, styles.actionDangerText]}>Delete</Text>
+                      <Text style={[styles.actionBtnText, styles.actionDangerText]}>{t.common.delete}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -403,7 +464,7 @@ export default function BoardScreen() {
                       <Image source={{ uri: userProfiles[task.completedBy]?.avatar_url }} style={styles.completedAvatar} />
                     ) : null}
                     <Text style={styles.completedInfoText}>
-                      Done by {userProfiles[task.completedBy]?.name || 'Someone'}
+                      {t.board.doneBy} {userProfiles[task.completedBy]?.name || t.common.someone} {t.board.at} {formatTimeFromISO(task.completedAt)}
                     </Text>
                   </View>
                 ) : null}
@@ -418,100 +479,150 @@ export default function BoardScreen() {
                       ))}
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
 
-            {isAdmin && (
-              <View>
+            <View>
+              {isAdmin && (
                 <TouchableOpacity style={styles.addTaskButton} onPress={() => openTaskModal(col.id)}>
-                  <Text style={styles.addTaskButtonText}>+ Add Task</Text>
+                  <Text style={styles.addTaskButtonText}>+ {t.board.addTask}</Text>
                 </TouchableOpacity>
-              </View>
-            )}
+              )}
+              <TouchableOpacity style={[styles.addTaskButton, { marginTop: 6 }]} onPress={async () => {
+                try {
+                  await snapshotColumnAndReset(boardId, col.id, { submittedBy: user?.id, submissionType: 'user' });
+                  Alert.alert(t.common.sent, t.board.columnSent);
+                  await load();
+                } catch (e: any) {
+                  Alert.alert(t.common.error, e?.message || t.board.unableSnapshotColumn);
+                }
+              }}>
+                <Text style={styles.addTaskButtonText}>{t.board.sendColumn}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           </ScrollView>
         ))}
 
         {isAdmin && (
           <View style={[styles.column, styles.addColumn]}>
-            <Text style={styles.columnTitle}>New Column</Text>
+            <Text style={styles.columnTitle}>{t.board.newColumn}</Text>
             <View style={styles.addColumnRow}>
               <TextInput
-                placeholder="Column name"
+                placeholder={t.board.columnNamePlaceholder}
                 value={newColumnTitle}
                 onChangeText={setNewColumnTitle}
                 style={styles.smallInput}
                 maxLength={28}
               />
               <TouchableOpacity style={styles.smallAddButton} onPress={handleAddColumn}>
-                <Text style={styles.smallAddButtonText}>Create</Text>
+                <Text style={styles.smallAddButtonText}>{t.common.create}</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity style={[styles.addTaskButton, { marginTop: 8 }]} onPress={async () => {
+              try {
+                await snapshotBoardAndReset(boardId, undefined, false, { submittedBy: user?.id, submissionType: 'admin_finish' });
+                Alert.alert(t.common.finished, t.board.boardFinished);
+                await load();
+              } catch (e: any) {
+                Alert.alert(t.common.error, e?.message || t.board.unableFinishReset);
+              }
+            }}>
+              <Text style={styles.addTaskButtonText}>{t.board.finishAndReset}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!isAdmin && (
+          <View style={[styles.column, styles.addColumn]}>
+            <Text style={styles.columnTitle}>{t.board.actions}</Text>
+            <TouchableOpacity style={[styles.addTaskButton, { marginTop: 8 }]} onPress={async () => {
+              try {
+                await snapshotBoardAndReset(boardId, undefined, false, { submittedBy: user?.id, submissionType: 'user' });
+                Alert.alert(t.common.sent, 'Board snapshot sent');
+                await load();
+              } catch (e: any) {
+                Alert.alert(t.common.error, e?.message || t.board.unableSendBoard);
+              }
+            }}>
+              <Text style={styles.addTaskButtonText}>{t.board.sendBoard}</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-      <Modal visible={!!taskModalColumnId} transparent animationType="fade" onRequestClose={closeTaskModal}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>New Task</Text>
-            <View style={{ gap: 10 }}>
-              <View>
-                <Text style={styles.modalLabel}>Title</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Task title"
-                  value={taskTitle}
-                  onChangeText={setTaskTitle}
-                />
-              </View>
-              <View>
-                <Text style={styles.modalLabel}>Description (optional)</Text>
-                <TextInput
-                  style={styles.modalTextArea}
-                  placeholder="Write a short description"
-                  value={taskDescription}
-                  onChangeText={setTaskDescription}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.modalLabel}>Date (optional)</Text>
+      <Modal visible={!!taskModalColumnId || !!editingTaskId} transparent animationType="fade" onRequestClose={closeTaskModal}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingView}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{editingTaskId ? t.board.modalEditTask : t.board.modalNewTask}</Text>
+              <View style={{ gap: 10 }}>
+                <View>
+                  <Text style={styles.modalLabel}>{t.board.labelTitle}</Text>
                   <TextInput
                     style={styles.modalInput}
-                    placeholder="DD-MM-YYYY"
-                    value={taskDueDate}
-                    onChangeText={setTaskDueDate}
-                    autoCapitalize="none"
-                    returnKeyType="done"
-                    blurOnSubmit
+                    placeholder={t.board.titlePlaceholder}
+                    value={taskTitle}
+                    onChangeText={setTaskTitle}
                   />
                 </View>
-                <View style={{ width: 120 }}>
-                  <Text style={styles.modalLabel}>Time (optional)</Text>
+                <View>
+                  <Text style={styles.modalLabel}>{t.board.labelDescription}</Text>
                   <TextInput
-                    style={styles.modalInput}
-                    placeholder="HH:MM"
-                    value={taskDueTime}
-                    onChangeText={setTaskDueTime}
-                    autoCapitalize="none"
-                    returnKeyType="done"
-                    blurOnSubmit
+                    style={styles.modalTextArea}
+                    placeholder={t.board.descriptionPlaceholder}
+                    value={taskDescription}
+                    onChangeText={setTaskDescription}
+                    multiline
+                    numberOfLines={3}
                   />
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalLabel}>{t.board.labelDate}</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="DD-MM-YYYY"
+                      value={taskDueDate}
+                      onChangeText={setTaskDueDate}
+                      autoCapitalize="none"
+                      returnKeyType="done"
+                      blurOnSubmit
+                    />
+                  </View>
+                  <View style={{ width: 120 }}>
+                    <Text style={styles.modalLabel}>{t.board.labelTime}</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="HH:MM"
+                      value={taskDueTime}
+                      onChangeText={setTaskDueTime}
+                      autoCapitalize="none"
+                      returnKeyType="done"
+                      blurOnSubmit
+                    />
+                  </View>
                 </View>
               </View>
-            </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={closeTaskModal} style={styles.modalCancel}>
-                <Text style={{ color: '#6b7280', fontWeight: '600' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleCreateTaskAdvanced} style={styles.modalSave}>
-                <Text style={{ color: 'white', fontWeight: '700' }}>Create</Text>
-              </TouchableOpacity>
+              <View style={styles.modalActions}>
+                <TouchableOpacity onPress={closeTaskModal} style={styles.modalCancel}>
+                  <Text style={{ color: '#6b7280', fontWeight: '600' }}>{t.common.cancel}</Text>
+                </TouchableOpacity>
+                {editingTaskId ? (
+                  <TouchableOpacity onPress={handleSaveTaskEdit} style={styles.modalSave}>
+                    <Text style={{ color: 'white', fontWeight: '700' }}>{t.common.save}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity onPress={handleCreateTaskAdvanced} style={styles.modalSave}>
+                    <Text style={{ color: 'white', fontWeight: '700' }}>{t.common.create}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -864,6 +975,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     justifyContent: 'center',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
 });
 

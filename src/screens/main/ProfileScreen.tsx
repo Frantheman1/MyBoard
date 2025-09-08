@@ -6,6 +6,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { getOrganizationById } from '../../utils/storage';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
+import AnimatedTitle from '../../../components/AnimatedTitle';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -63,7 +64,7 @@ export default function ProfileScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'We need access to your photos to set a profile picture');
+        Alert.alert(t.profile.permissionNeededTitle, t.profile.permissionNeededMessage);
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -79,7 +80,7 @@ export default function ProfileScreen() {
       const arrayBuffer = await resp.arrayBuffer();
       const fileData = new Uint8Array(arrayBuffer);
       if (!fileData || fileData.byteLength === 0) {
-        throw new Error('Selected file is empty');
+        throw new Error(t.profile.selectedFileEmpty);
       }
 
       const nameExt = (asset as any).fileName?.split('.').pop()?.toLowerCase();
@@ -109,14 +110,14 @@ export default function ProfileScreen() {
       setMembers(prev => prev.map(m => (m.id === user.id ? { ...m, avatar_url: url } : m)));
     } catch (e: any) {
       console.error('Avatar update error:', e);
-      Alert.alert('Error', e?.message || 'Unable to update profile picture');
+      Alert.alert(t.common.error, e?.message || t.profile.unableUpdateProfilePicture);
     }
   };
 
   const handleLogout = () => {
     Alert.alert(
       t.common.logout,
-      'Are you sure you want to sign out?',
+      t.profile.logoutConfirmMessage,
       [
         { text: t.common.cancel, style: 'cancel' },
         {
@@ -138,7 +139,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t.settings.title}</Text>
+        <AnimatedTitle text={t.settings.title} style={styles.headerTitle} />
       </View>
 
       <View style={styles.content}>
@@ -179,8 +180,8 @@ export default function ProfileScreen() {
 
           {user.role === 'admin' && (
             <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>Invite Code</Text>
-              <TouchableOpacity onPress={() => { if (inviteCode) { Alert.alert('Invite Code', inviteCode); } }}>
+              <Text style={styles.settingLabel}>{t.profile.inviteCode}</Text>
+              <TouchableOpacity onPress={() => { if (inviteCode) { Alert.alert(t.profile.inviteCode, inviteCode); } }}>
                 <Text style={[styles.settingValue, { textDecorationLine: 'underline' }]}>{inviteCode || '-'}</Text>
               </TouchableOpacity>
             </View>
@@ -195,14 +196,14 @@ export default function ProfileScreen() {
         {user.role === 'admin' && (
           <View style={styles.membersCard}>
             <View style={styles.membersHeader}>
-              <Text style={styles.membersTitle}>Organization Members</Text>
+              <Text style={styles.membersTitle}>{t.profile.organizationMembers}</Text>
               <Text style={styles.membersCount}>{members.length}</Text>
             </View>
             <ScrollView>
             {membersLoading ? (
-              <Text style={styles.membersLoading}>Loading…</Text>
+              <Text style={styles.membersLoading}>{t.profile.loading}</Text>
             ) : members.length === 0 ? (
-              <Text style={styles.membersEmpty}>No members yet</Text>
+              <Text style={styles.membersEmpty}>{t.profile.noMembersYet}</Text>
             ) : (
               <View>
                 {members.map(m => (
@@ -231,8 +232,8 @@ export default function ProfileScreen() {
 
         {/* App Info */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>{t.dashboard.title} Mobile</Text>
-          <Text style={styles.footerSubtext}>Version 1.0.0</Text>
+          <Text style={styles.footerText}>{t.dashboard.title}</Text>
+          <Text style={styles.footerSubtext}>{t.profile.version} 1.0.0</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -369,6 +370,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    
   },
   membersHeader: {
     flexDirection: 'row',

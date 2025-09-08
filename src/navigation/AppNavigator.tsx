@@ -12,16 +12,18 @@ import { useLanguage } from '../contexts/LanguageContext';
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
-import NotificationsScreen from '../screens/main/NotificationsScreen';
+import AdminScreen from '../screens/main/AdminScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import BoardScreen from '../screens/main/BoardScreen';
+import SnapshotScreen from '../screens/main/SnapshotScreen';
+// removed daily auto-finish
 
 const RootStack = createStackNavigator();
 const MainTab = createBottomTabNavigator();
 
 function MainTabNavigator() {
   const { t } = useLanguage();
-
+  const { user } = useAuth();
   return (
     <MainTab.Navigator
       screenOptions={{
@@ -36,20 +38,22 @@ function MainTabNavigator() {
         options={{
           tabBarLabel: t.dashboard.title,
           tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+            <Ionicons name={focused ? 'clipboard' : 'clipboard-outline'} size={size} color={color} />
           )
         }}
       />
+      {user?.role === 'admin' && (
       <MainTab.Screen 
-        name="Notifications" 
-        component={NotificationsScreen}
+        name="Admin" 
+        component={AdminScreen}
         options={{
-          tabBarLabel: t.notifications.title,
+          tabBarLabel: t.admin.title,
           tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) => (
-            <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={size} color={color} />
+            <Ionicons name={focused ? 'shield' : 'shield-outline'} size={size} color={color} />
           )
-        }}
-      />
+          }}
+        />
+      )}
       <MainTab.Screen 
         name="Profile" 
         component={ProfileScreen}
@@ -65,16 +69,20 @@ function MainTabNavigator() {
 }
 
 function LoadingScreen() {
+  const { t } = useLanguage();
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <ActivityIndicator size="large" color="#6366f1" />
-      <Text style={{ marginTop: 16, fontSize: 16, color: '#6b7280' }}>Loading...</Text>
+      <Text style={{ marginTop: 16, fontSize: 16, color: '#6b7280' }}>{t.common.loading}</Text>
     </View>
   );
 }
 
 export default function AppNavigator() {
   const { user, isLoading } = useAuth();
+
+  // Auto-finish daily at app start (acts as a fallback if cron isn't running)
+  // Daily auto-finish removed as per new requirements
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -94,6 +102,11 @@ export default function AppNavigator() {
                 gestureEnabled: true,
                 gestureDirection: 'horizontal',
               }}
+            />
+            <RootStack.Screen 
+              name="Snapshot" 
+              component={SnapshotScreen}
+              options={{ headerShown: false }}
             />
           </>
         ) : (

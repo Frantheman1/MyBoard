@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 // types no longer needed here since auth is handled by Supabase
+import AnimatedTitle from '../../../components/AnimatedTitle';
 
 export default function LoginScreen() {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -59,8 +60,8 @@ export default function LoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>{t.dashboard.title}</Text>
-            <Text style={styles.subtitle}>Modern task management for teams</Text>
+            <AnimatedTitle text={t.dashboard.title} style={styles.title} />
+            <Text style={styles.subtitle}>{t.login.subtitle}</Text>
           </View>
 
           <View style={styles.form}>
@@ -74,7 +75,7 @@ export default function LoginScreen() {
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="Enter your email"
+                placeholder={t.login.emailPlaceholder}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -86,7 +87,7 @@ export default function LoginScreen() {
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Enter your password"
+                placeholder={t.login.passwordPlaceholder}
                 secureTextEntry
                 autoCapitalize="none"
               />
@@ -107,7 +108,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <View style={[styles.switchModeButton, { opacity: 0.6 }]}>
-              <Text style={styles.switchModeText}>Accounts are created in MyTime</Text>
+              <Text style={styles.switchModeText}>{t.login.accountsManaged}</Text>
             </View>
           </View>
         </ScrollView>

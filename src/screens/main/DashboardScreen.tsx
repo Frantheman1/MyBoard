@@ -6,6 +6,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { Board } from '../../types';
 import { getBoardsByOrganizationId, createBoard } from '../../utils/storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import AnimatedTitle from '../../../components/AnimatedTitle';
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -36,15 +37,15 @@ export default function DashboardScreen() {
       await loadBoards();
       navigation.navigate('Board', { boardId: newBoard.id });
     } catch (e) {
-      Alert.alert('Error', 'Unable to create board');
+      Alert.alert(t.common.error, t.dashboard.unableCreateBoard);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t.dashboard.title}</Text>
-        <Text style={styles.headerSubtitle}>Welcome, {user?.name}!</Text>
+        <AnimatedTitle text={t.dashboard.title} style={styles.headerTitle} />
+        <Text style={styles.headerSubtitle}>{t.dashboard.welcome}, {user?.name}!</Text>
       </View>
 
       <View style={styles.content}>
@@ -54,7 +55,7 @@ export default function DashboardScreen() {
             <Text style={styles.emptySubtitle}>
               {user?.role === 'admin' 
                 ? t.dashboard.noBoardsAdmin 
-                : 'Your admin will create boards for you to work with'}
+                : t.dashboard.noBoardsAdmin}
             </Text>
             {user?.role === 'admin' && (
               <TouchableOpacity style={styles.createButton} onPress={handleCreateBoard}>
