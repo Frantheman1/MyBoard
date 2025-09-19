@@ -10,6 +10,9 @@ import { Board, BoardSnapshot } from '../../types';
 import { getBoardsByOrganizationId, listSnapshotsByOrganization, snapshotBoardAndReset, deleteSnapshot } from '../../utils/storage';
 import AnimatedTitle from '../../../components/AnimatedTitle';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../contexts/ThemeContext';
+import Card from '../../components/ui/Card';
 
 export default function AdminScreen() {
   const { user } = useAuth();
@@ -20,6 +23,7 @@ export default function AdminScreen() {
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
   const [isBoardsOpen, setIsBoardsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const { theme } = useTheme();
 
   const isAdmin = user?.role === 'admin';
 
@@ -72,37 +76,37 @@ export default function AdminScreen() {
   const renderSectionHeader = (title: string, count: number, onPress?: () => void, open?: boolean) => (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.sectionHeader}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.chevron}>{open ? '▾' : '▸'}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{title}</Text>
+        <Text style={[styles.chevron, { color: theme.colors.secondaryText }]}>{open ? '▾' : '▸'}</Text>
       </View>
-      <View style={styles.countPill}><Text style={styles.countPillText}>{count}</Text></View>
+      <View style={[styles.countPill, { backgroundColor: theme.colors.border }]}><Text style={[styles.countPillText, { color: theme.colors.text }]}>{count}</Text></View>
     </TouchableOpacity>
   );
 
   const renderBoardItem = (board: Board) => (
-    <View style={styles.card}>
+    <Card style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.cardTitle}>{board.title}</Text>
-        <Text style={styles.cardSubtitle}>{t.admin.created}: {formatDateTime(board.createdAt)}</Text>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{board.title}</Text>
+        <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.created}: {formatDateTime(board.createdAt)}</Text>
       </View>
       {isAdmin && (
-        <TouchableOpacity style={[styles.actionBtn, styles.primaryBtn]} onPress={() => confirmFinishBoard(board)}>
-          <Text style={styles.primaryBtnText}>{t.admin.finish}</Text>
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]} onPress={() => confirmFinishBoard(board)}>
+          <Text style={[styles.primaryBtnText]}>{t.admin.finish}</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </Card>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <AnimatedTitle text={t.admin.title} style={styles.headerTitle} />
-      </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <LinearGradient colors={[theme.colors.primary, theme.colors.primaryAlt]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <AnimatedTitle text={t.admin.title} style={[styles.headerTitle, { color: 'white' }]} />
+      </LinearGradient>
 
       <View style={styles.content}>
         {renderSectionHeader(t.admin.boards, activeBoards.length, () => setIsBoardsOpen(prev => !prev), isBoardsOpen)}
         {isBoardsOpen && (activeBoards.length === 0 ? (
-          <View style={styles.emptyState}><Text style={styles.emptyText}>{t.admin.noBoards}</Text></View>
+          <View style={styles.emptyState}><Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>{t.admin.noBoards}</Text></View>
         ) : (
           <FlatList
             data={activeBoards}
@@ -114,7 +118,7 @@ export default function AdminScreen() {
 
         {renderSectionHeader(t.admin.history, snapshots.length, () => setIsHistoryOpen(prev => !prev), isHistoryOpen)}
         {isHistoryOpen && (snapshots.length === 0 ? (
-          <View style={styles.emptyState}><Text style={styles.emptyText}>{t.admin.noSnapshots}</Text></View>
+          <View style={styles.emptyState}><Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>{t.admin.noSnapshots}</Text></View>
         ) : (
           <FlatList
             data={snapshots}
@@ -135,16 +139,16 @@ export default function AdminScreen() {
                   </TouchableOpacity>
                 )}
               >
-                <View style={styles.card}>
+                <Card style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardSubtitle}>{t.admin.finishedOn}: {item.finishedOn}</Text>
-                    <Text style={[styles.cardSubtitle, { marginTop: 2 }]}>{t.admin.by}: {item.submittedBy ? (profileNames[item.submittedBy] || item.submittedBy) : t.common.unknown}</Text>
+                    <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{item.title}</Text>
+                    <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.finishedOn}: {item.finishedOn}</Text>
+                    <Text style={[styles.cardSubtitle, { marginTop: 2, color: theme.colors.secondaryText }]}>{t.admin.by}: {item.submittedBy ? (profileNames[item.submittedBy] || item.submittedBy) : t.common.unknown}</Text>
                   </View>
-                  <TouchableOpacity style={[styles.actionBtn, styles.primaryBtn]} onPress={() => navigation.navigate('Snapshot', { snapshotId: item.id })}>
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]} onPress={() => navigation.navigate('Snapshot', { snapshotId: item.id })}>
                     <Text style={styles.primaryBtnText}>{t.common.open}</Text>
                   </TouchableOpacity>
-                </View>
+                </Card>
               </Swipeable>
             )}
           />
@@ -155,31 +159,22 @@ export default function AdminScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  chevron: { fontSize: 18, color: '#6b7280' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937' },
+  container: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingVertical: 20, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
+  chevron: { fontSize: 18 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
   content: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 6 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1f2937' },
-  countPill: { backgroundColor: '#e5e7eb', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
-  countPillText: { fontSize: 12, color: '#374151', fontWeight: '600' },
-  card: { backgroundColor: 'white', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  cardSubtitle: { fontSize: 12, color: '#6b7280', marginTop: 4 },
-  emptyState: { backgroundColor: '#f3f4f6', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 10 },
-  emptyText: { fontSize: 14, color: '#6b7280' },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  countPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  countPillText: { fontSize: 12, fontWeight: '600' },
+  card: { borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  cardTitle: { fontSize: 16, fontWeight: '700' },
+  cardSubtitle: { fontSize: 12, marginTop: 4 },
+  emptyState: { borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 10 },
+  emptyText: { fontSize: 14 },
   actionBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  primaryBtn: { backgroundColor: '#6366f1' },
   primaryBtnText: { color: 'white', fontWeight: '700' },
   dangerBtn: { backgroundColor: '#fee2e2' },
   dangerBtnText: { color: '#b91c1c', fontWeight: '700' },
 });
-
-

@@ -38,6 +38,7 @@ export interface Task {
   description?: string;
   dueDate?: string;
   dueTime?: string;
+  importanceColor?: string;
   columnId: string;
   boardId: string;
   completed: boolean;
@@ -77,6 +78,7 @@ export interface TaskSnapshot {
   dueTime?: string;
   completedAt?: string;
   completedBy?: string;
+  importanceColor?: string;
   originalColumnId: string;
   originalTaskId: string;
 }

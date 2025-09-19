@@ -248,6 +248,7 @@ export async function getTasksByBoardId(boardId: string): Promise<Task[]> {
     description: t.description || undefined,
     dueDate: t.due_date || undefined,
     dueTime: t.due_time || undefined,
+    importanceColor: t.importance_color || undefined,
     columnId: t.column_id,
     boardId: t.board_id,
     completed: !!t.completed,
@@ -271,6 +272,7 @@ export async function getTasksByColumnId(columnId: string): Promise<Task[]> {
     description: t.description || undefined,
     dueDate: t.due_date || undefined,
     dueTime: t.due_time || undefined,
+    importanceColor: t.importance_color || undefined,
     columnId: t.column_id,
     boardId: t.board_id,
     completed: !!t.completed,
@@ -288,6 +290,7 @@ export async function createTask(params: {
   description?: string;
   dueDate?: string;
   dueTime?: string;
+  importanceColor?: string;
   createdBy: string;
 }): Promise<Task> {
   const { data, error } = await supabase
@@ -298,6 +301,7 @@ export async function createTask(params: {
         description: params.description,
         due_date: params.dueDate,
         due_time: params.dueTime,
+        importance_color: (params as any).importanceColor || null,
         column_id: params.columnId,
         board_id: params.boardId,
         created_by: params.createdBy,
@@ -326,6 +330,7 @@ export async function updateTask(taskId: string, updates: Partial<Omit<Task, 'id
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.dueDate !== undefined) payload.due_date = updates.dueDate;
   if (updates.dueTime !== undefined) payload.due_time = updates.dueTime;
+  if ((updates as any).importanceColor !== undefined) payload.importance_color = (updates as any).importanceColor;
   if (updates.columnId !== undefined) payload.column_id = updates.columnId;
   if (updates.boardId !== undefined) payload.board_id = updates.boardId;
   if (updates.completed !== undefined) payload.completed = updates.completed;
@@ -473,6 +478,7 @@ export async function getSnapshotTasks(snapshotId: string): Promise<TaskSnapshot
     dueTime: t.due_time || undefined,
     completedAt: t.completed_at || undefined,
     completedBy: t.completed_by || undefined,
+    importanceColor: t.importance_color || undefined,
     originalColumnId: t.original_column_id,
     originalTaskId: t.original_task_id,
   }));
@@ -545,6 +551,7 @@ export async function snapshotBoardAndReset(boardId: string, finishedOn?: string
       due_time: t.dueTime || null,
       completed_at: t.completedAt || null,
       completed_by: t.completedBy || null,
+      importance_color: t.importanceColor || null,
       original_column_id: t.columnId,
       original_task_id: t.id,
     }));
@@ -641,6 +648,7 @@ export async function snapshotColumnAndReset(boardId: string, columnId: string, 
       due_time: t.dueTime || null,
       completed_at: t.completedAt || null,
       completed_by: t.completedBy || null,
+      importance_color: t.importanceColor || null,
       original_column_id: t.columnId,
       original_task_id: t.id,
     }));

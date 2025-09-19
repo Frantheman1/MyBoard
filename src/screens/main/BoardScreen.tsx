@@ -7,6 +7,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { Column, Task } from '../../types';
 import { supabase } from '../../../lib/supabase';
 import AnimatedTitle from '../../../components/AnimatedTitle';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   getBoardById,
   getColumnsByBoardId,
@@ -33,6 +35,7 @@ export default function BoardScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { theme, isDark } = useTheme();
   const boardId = route.params.boardId;
 
   const [boardTitle, setBoardTitle] = useState('');
@@ -46,6 +49,7 @@ export default function BoardScreen() {
   const [taskDescription, setTaskDescription] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskDueTime, setTaskDueTime] = useState('');
+  const [taskImportanceColor, setTaskImportanceColor] = useState<string>('');
   const [userProfiles, setUserProfiles] = useState<Record<string, { name: string; email: string; avatar_url?: string }>>({});
 
   // Helpers for date parsing/formatting
@@ -100,6 +104,17 @@ export default function BoardScreen() {
   };
 
   const isAdmin = user?.role === 'admin';
+  // Simple contrast helper to ensure readable text on colored backgrounds
+  const getContrastingTextColor = (hex?: string): string => {
+    if (!hex) return theme.colors.text;
+    const c = hex.replace('#', '');
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    // Perceived luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.6 ? '#111827' : '#FFFFFF';
+  };
 
   const load = async () => {
     const board = await getBoardById(boardId);
@@ -164,7 +179,7 @@ export default function BoardScreen() {
         { text: t.common.cancel, style: 'cancel' },
         {
           text: t.common.save,
-          onPress: async (text) => {
+          onPress: async (text?: string) => {
             if (text?.trim()) {
               await renameColumn(columnId, text.trim());
               await load();
@@ -233,6 +248,7 @@ export default function BoardScreen() {
     setTaskDescription('');
     setTaskDueDate('');
     setTaskDueTime('');
+    setTaskImportanceColor('');
   };
 
   const closeTaskModal = () => {
@@ -247,6 +263,7 @@ export default function BoardScreen() {
     setTaskDescription(task.description || '');
     setTaskDueDate(formatISOToInput(task.dueDate));
     setTaskDueTime(task.dueTime || '');
+    setTaskImportanceColor(task.importanceColor || '');
   };
 
   const handleCreateTaskAdvanced = async () => {
@@ -264,6 +281,8 @@ export default function BoardScreen() {
         description: taskDescription.trim() || undefined,
         dueDate: parseDateInputToISO(taskDueDate) || undefined,
         dueTime: taskDueTime || undefined,
+        // allow empty string to mean "no color"
+        importanceColor: typeof taskImportanceColor === 'string' ? taskImportanceColor : undefined,
         createdBy: user.id,
       });
       closeTaskModal();
@@ -287,6 +306,8 @@ export default function BoardScreen() {
         description: taskDescription.trim() || undefined,
         dueDate: parseDateInputToISO(taskDueDate) || undefined,
         dueTime: taskDueTime || undefined,
+        // send empty string to clear color (storage maps '' -> null)
+        importanceColor: taskImportanceColor,
       });
       setEditingTaskId(null);
       setTaskModalColumnId(null);
@@ -327,7 +348,7 @@ export default function BoardScreen() {
         { text: t.common.cancel, style: 'cancel' },
         {
           text: t.common.save,
-          onPress: async (text) => {
+          onPress: async (text?: string) => {
             if (text?.trim()) {
               try {
                 await updateBoardTitle(boardId, text.trim());
@@ -367,23 +388,23 @@ export default function BoardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <LinearGradient colors={[theme.colors.primary, theme.colors.primaryAlt]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
-          <Text style={styles.headerBackIcon}>←</Text>
+          <Text style={[styles.headerBackIcon, { color: 'white' }]}>←</Text>
         </TouchableOpacity>
-        <AnimatedTitle text={boardTitle} style={styles.headerTitle} />
+        <AnimatedTitle text={boardTitle} style={[styles.headerTitle, { color: 'white' }]} />
         {isAdmin && (
           <View style={{ flexDirection: 'row', gap: 16 }}>
             <TouchableOpacity onPress={handleRenameBoard}>
-              <Text style={styles.headerAction}>{t.common.edit}</Text>
+              <Text style={[styles.headerAction, { color: 'white' }]}>{t.common.edit}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteBoard}>
-              <Text style={styles.headerActionDanger}>{t.common.delete}</Text>
+              <Text style={[styles.headerActionDanger, { color: 'black' }]}>{t.common.delete}</Text>
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </LinearGradient>
 
       <ScrollView horizontal contentContainerStyle={styles.columnsContainer}>
         {columns.map(col => (
@@ -391,12 +412,12 @@ export default function BoardScreen() {
               key={col.id} 
               contentContainerStyle={{ paddingBottom: 20 }} 
             >
-          <View key={col.id} style={styles.column}>
+          <View key={col.id} style={[styles.column, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <View style={styles.columnHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.columnTitle}>{col.title}</Text>
-                <View style={styles.countPill}>
-                  <Text style={styles.countPillText}>
+                <Text style={[styles.columnTitle, { color: theme.colors.text }]}>{col.title}</Text>
+                <View style={[styles.countPill, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
+                  <Text style={[styles.countPillText, { color: theme.colors.secondaryText }]}>
                     {(tasksByColumn[col.id] || []).filter(t => t.completed).length}
                     /
                     {(tasksByColumn[col.id] || []).length}
@@ -405,36 +426,51 @@ export default function BoardScreen() {
               </View>
               {isAdmin && (
                 <TouchableOpacity onPress={() => openEditColumn(col.id)}>
-                  <Text style={styles.columnAction}>{t.common.edit}</Text>
+                  <Text style={[styles.columnAction, { color: theme.colors.primary }]}>{t.common.edit}</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {(tasksByColumn[col.id] || []).length === 0 && (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyCardTitle}>{t.board.noTasks}</Text>
+              <View style={[styles.emptyCard, { backgroundColor: isDark ? '#0f172a' : '#f9fafb' }]}>
+                <Text style={[styles.emptyCardTitle, { color: theme.colors.text }]}>{t.board.noTasks}</Text>
                 {isAdmin ? (
-                  <Text style={styles.emptyCardSub}>{t.board.emptyAdminHint}</Text>
+                  <Text style={[styles.emptyCardSub, { color: theme.colors.secondaryText }]}>{t.board.emptyAdminHint}</Text>
                 ) : (
-                  <Text style={styles.emptyCardSub}>{t.board.emptyEmployeeHint}</Text>
+                  <Text style={[styles.emptyCardSub, { color: theme.colors.secondaryText }]}>{t.board.emptyEmployeeHint}</Text>
                 )}
               </View>
             )}
 
-            {(tasksByColumn[col.id] || []).map(task => (
-              <TouchableOpacity key={task.id} activeOpacity={0.8} onPress={() => openEditTask(task)} style={[styles.taskCard, task.completed && styles.taskCardDone]}>
+            {(tasksByColumn[col.id] || []).map(task => {
+              const isColored = !!task.importanceColor && !task.completed;
+              const cardBg = task.completed
+                ? (isDark ? '#064e3b' : '#ecfdf5')
+                : (task.importanceColor || (isDark ? '#111827' : '#f9fafb'));
+              const textOnBg = isColored ? getContrastingTextColor(task.importanceColor || undefined) : theme.colors.text;
+              const secondaryOnBg = isColored ? (textOnBg === '#FFFFFF' ? 'rgba(255,255,255,0.9)' : '#374151') : theme.colors.secondaryText;
+              const chipBg = isColored ? (textOnBg === '#FFFFFF' ? 'rgba(255,255,255,0.25)' : 'rgba(17,24,39,0.08)') : (isDark ? '#1f2937' : '#f3f4f6');
+              const chipText = isColored ? (textOnBg === '#FFFFFF' ? '#FFFFFF' : '#374151') : theme.colors.secondaryText;
+              return (
+              <TouchableOpacity key={task.id} activeOpacity={0.8} onPress={() => openEditTask(task)} style={[styles.taskCard, { backgroundColor: cardBg }]}>
                 <View style={styles.taskContentRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.taskTitle, task.completed && styles.taskTitleDone]} numberOfLines={2}>
-                      {task.title}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {/* Hide dot when full card is colored */}
+                      {!isColored && task.importanceColor ? (
+                        <View style={[styles.importanceDot, { backgroundColor: task.importanceColor }]} />
+                      ) : null}
+                      <Text style={[styles.taskTitle, { color: task.completed ? '#065f46' : textOnBg }, task.completed && styles.taskTitleDone]} numberOfLines={2}>
+                        {task.title}
+                      </Text>
+                    </View>
                     {task.description ? (
-                      <Text style={styles.taskDesc}>{task.description}</Text>
+                      <Text style={[styles.taskDesc, { color: task.completed ? '#065f46' : secondaryOnBg }]}>{task.description}</Text>
                     ) : null}
                   </View>
                   <View style={styles.taskMeta}>
                     {(task.dueDate || task.dueTime) ? (
-                      <Text style={styles.dueDateText}>
+                      <Text style={[styles.dueDateText, { backgroundColor: chipBg, color: chipText }]}>
                         {[
                           task.dueDate ? formatISOForDisplayNO(task.dueDate) : undefined,
                           task.dueTime
@@ -444,8 +480,8 @@ export default function BoardScreen() {
                   </View>
                 </View>
                 <View style={styles.taskActionsRow}>
-                  <TouchableOpacity onPress={() => handleToggleDone(task.id, !task.completed)} style={[styles.actionBtn, task.completed ? styles.actionDone : styles.actionPrimary]}>
-                    <Text style={[styles.actionBtnText, task.completed ? styles.actionDoneText : undefined]}>
+                  <TouchableOpacity onPress={() => handleToggleDone(task.id, !task.completed)} style={[styles.actionBtn, task.completed ? styles.actionDone : styles.actionPrimary, task.completed ? { backgroundColor: isDark ? '#064e3b' : undefined } : { backgroundColor: theme.colors.primary }]}>
+                    <Text style={[styles.actionBtnText, { color: task.completed ? '#387053' : 'white' }]}>
                       {task.completed ? t.board.done : t.board.markDone}
                     </Text>
                   </TouchableOpacity>
@@ -463,7 +499,7 @@ export default function BoardScreen() {
                     {userProfiles[task.completedBy]?.avatar_url ? (
                       <Image source={{ uri: userProfiles[task.completedBy]?.avatar_url }} style={styles.completedAvatar} />
                     ) : null}
-                    <Text style={styles.completedInfoText}>
+                    <Text style={[styles.completedInfoText, { color: theme.colors.secondaryText }]}>
                       {t.board.doneBy} {userProfiles[task.completedBy]?.name || t.common.someone} {t.board.at} {formatTimeFromISO(task.completedAt)}
                     </Text>
                   </View>
@@ -474,18 +510,18 @@ export default function BoardScreen() {
                       .filter(c => c.id !== col.id)
                       .map(c => (
                         <TouchableOpacity key={c.id} onPress={() => handleMoveTask(task.id, c.id)}>
-                          <Text style={styles.moveChip}>→ {c.title}</Text>
+                          <Text style={[styles.moveChip, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: theme.colors.secondaryText }]}>→ {c.title}</Text>
                         </TouchableOpacity>
                       ))}
                   </View>
                 )}
               </TouchableOpacity>
-            ))}
+            );})}
 
             <View>
               {isAdmin && (
                 <TouchableOpacity style={styles.addTaskButton} onPress={() => openTaskModal(col.id)}>
-                  <Text style={styles.addTaskButtonText}>+ {t.board.addTask}</Text>
+                  <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>+ {t.board.addTask}</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={[styles.addTaskButton, { marginTop: 6 }]} onPress={async () => {
@@ -497,7 +533,7 @@ export default function BoardScreen() {
                   Alert.alert(t.common.error, e?.message || t.board.unableSnapshotColumn);
                 }
               }}>
-                <Text style={styles.addTaskButtonText}>{t.board.sendColumn}</Text>
+                <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>{t.board.sendColumn}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -505,14 +541,14 @@ export default function BoardScreen() {
         ))}
 
         {isAdmin && (
-          <View style={[styles.column, styles.addColumn]}>
-            <Text style={styles.columnTitle}>{t.board.newColumn}</Text>
+          <View style={[styles.column, styles.addColumn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Text style={[styles.columnTitle, { color: theme.colors.text }]}>{t.board.newColumn}</Text>
             <View style={styles.addColumnRow}>
               <TextInput
                 placeholder={t.board.columnNamePlaceholder}
                 value={newColumnTitle}
                 onChangeText={setNewColumnTitle}
-                style={styles.smallInput}
+                style={[styles.smallInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: isDark ? '#0f172a' : 'white' }]}
                 maxLength={28}
               />
               <TouchableOpacity style={styles.smallAddButton} onPress={handleAddColumn}>
@@ -528,14 +564,14 @@ export default function BoardScreen() {
                 Alert.alert(t.common.error, e?.message || t.board.unableFinishReset);
               }
             }}>
-              <Text style={styles.addTaskButtonText}>{t.board.finishAndReset}</Text>
+              <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>{t.board.finishAndReset}</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {!isAdmin && (
-          <View style={[styles.column, styles.addColumn]}>
-            <Text style={styles.columnTitle}>{t.board.actions}</Text>
+          <View style={[styles.column, styles.addColumn, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Text style={[styles.columnTitle, { color: theme.colors.text }]}>{t.board.actions}</Text>
             <TouchableOpacity style={[styles.addTaskButton, { marginTop: 8 }]} onPress={async () => {
               try {
                 await snapshotBoardAndReset(boardId, undefined, false, { submittedBy: user?.id, submissionType: 'user' });
@@ -545,7 +581,7 @@ export default function BoardScreen() {
                 Alert.alert(t.common.error, e?.message || t.board.unableSendBoard);
               }
             }}>
-              <Text style={styles.addTaskButtonText}>{t.board.sendBoard}</Text>
+              <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>{t.board.sendBoard}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -556,22 +592,22 @@ export default function BoardScreen() {
           style={styles.keyboardAvoidingView}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>{editingTaskId ? t.board.modalEditTask : t.board.modalNewTask}</Text>
+            <View style={[styles.modalCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingTaskId ? t.board.modalEditTask : t.board.modalNewTask}</Text>
               <View style={{ gap: 10 }}>
                 <View>
-                  <Text style={styles.modalLabel}>{t.board.labelTitle}</Text>
+                  <Text style={[styles.modalLabel, { color: theme.colors.secondaryText }]}>{t.board.labelTitle}</Text>
                   <TextInput
-                    style={styles.modalInput}
+                    style={[styles.modalInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: isDark ? '#0f172a' : 'white' }]}
                     placeholder={t.board.titlePlaceholder}
                     value={taskTitle}
                     onChangeText={setTaskTitle}
                   />
                 </View>
                 <View>
-                  <Text style={styles.modalLabel}>{t.board.labelDescription}</Text>
+                  <Text style={[styles.modalLabel, { color: theme.colors.secondaryText }]}>{t.board.labelDescription}</Text>
                   <TextInput
-                    style={styles.modalTextArea}
+                    style={[styles.modalTextArea, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: isDark ? '#0f172a' : 'white' }]}
                     placeholder={t.board.descriptionPlaceholder}
                     value={taskDescription}
                     onChangeText={setTaskDescription}
@@ -581,9 +617,9 @@ export default function BoardScreen() {
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.modalLabel}>{t.board.labelDate}</Text>
+                    <Text style={[styles.modalLabel, { color: theme.colors.secondaryText }]}>{t.board.labelDate}</Text>
                     <TextInput
-                      style={styles.modalInput}
+                      style={[styles.modalInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: isDark ? '#0f172a' : 'white' }]}
                       placeholder="DD-MM-YYYY"
                       value={taskDueDate}
                       onChangeText={setTaskDueDate}
@@ -593,9 +629,9 @@ export default function BoardScreen() {
                     />
                   </View>
                   <View style={{ width: 120 }}>
-                    <Text style={styles.modalLabel}>{t.board.labelTime}</Text>
+                    <Text style={[styles.modalLabel, { color: theme.colors.secondaryText }]}>{t.board.labelTime}</Text>
                     <TextInput
-                      style={styles.modalInput}
+                      style={[styles.modalInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: isDark ? '#0f172a' : 'white' }]}
                       placeholder="HH:MM"
                       value={taskDueTime}
                       onChangeText={setTaskDueTime}
@@ -605,10 +641,36 @@ export default function BoardScreen() {
                     />
                   </View>
                 </View>
+                {isAdmin ? (
+                  <View>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {['', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'].map((c) => (
+                        <TouchableOpacity
+                          key={c || 'none'}
+                          onPress={() => setTaskImportanceColor(c)}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            backgroundColor: c || 'transparent',
+                            borderWidth: c ? 0 : 1,
+                            borderColor: theme.colors.border,
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {taskImportanceColor === c ? (
+                            <Text style={{ color: c ? 'white' : theme.colors.text, fontSize: 16 }}>•</Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
               </View>
               <View style={styles.modalActions}>
                 <TouchableOpacity onPress={closeTaskModal} style={styles.modalCancel}>
-                  <Text style={{ color: '#6b7280', fontWeight: '600' }}>{t.common.cancel}</Text>
+                  <Text style={{ color: theme.colors.secondaryText, fontWeight: '600' }}>{t.common.cancel}</Text>
                 </TouchableOpacity>
                 {editingTaskId ? (
                   <TouchableOpacity onPress={handleSaveTaskEdit} style={styles.modalSave}>
@@ -629,35 +691,16 @@ export default function BoardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  container: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerBack: { marginRight: 8 },
-  headerBackIcon: { fontSize: 18, color: '#4f46e5' },
+  headerBackIcon: { fontSize: 18 },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1f2937',
   },
-  headerAction: {
-    color: '#6366f1',
-    fontWeight: '600',
-  },
-  headerActionDanger: {
-    color: '#ef4444',
-    fontWeight: '600',
-  },
+  headerAction: { fontWeight: '600' },
+  headerActionDanger: { fontWeight: '600' },
   viewOnlyBanner: {
     backgroundColor: '#eef2ff',
     paddingHorizontal: 16,
@@ -676,18 +719,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  column: {
-    width: 280,
-    marginRight: 12,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+  column: { width: 280, marginRight: 12, borderRadius: 12, padding: 12 },
   addColumn: {
     alignItems: 'stretch',
     justifyContent: 'flex-start',
@@ -698,41 +730,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  columnTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  countPill: {
-    marginLeft: 8,
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  countPillText: {
-    fontSize: 12,
-    color: '#4b5563',
-    fontWeight: '600',
-  },
+  columnTitle: { fontSize: 16, fontWeight: '700' },
+  countPill: { marginLeft: 8, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  countPillText: { fontSize: 12, fontWeight: '600' },
   columnAction: {
     color: '#6366f1',
     fontSize: 12,
     fontWeight: '600',
   },
-  taskCard: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-  },
+  taskCard: { borderRadius: 8, padding: 10, marginBottom: 8 },
   taskCardDone: {
     backgroundColor: '#ecfdf5',
   },
   taskTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
   },
   taskTitleDone: {
     textDecorationLine: 'line-through',
@@ -740,7 +752,6 @@ const styles = StyleSheet.create({
   },
   taskDesc: {
     fontSize: 12,
-    color: '#6b7280',
     marginTop: 4,
   },
   taskContentRow: {
@@ -752,13 +763,11 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     alignItems: 'flex-end',
   },
-  dueDateText: {
-    fontSize: 12,
-    color: '#4b5563',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 999,
+  dueDateText: { fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  importanceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   badge: {
     borderRadius: 6,
@@ -791,9 +800,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 12,
   },
-  actionPrimary: {
-    backgroundColor: '#6366f1',
-  },
+  actionPrimary: { backgroundColor: '#6366f1' },
   actionDone: {
     backgroundColor: '#ecfdf5',
   },
@@ -818,18 +825,8 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: '#e5e7eb',
   },
-  completedInfoText: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  moveChip: {
-    backgroundColor: '#e5e7eb',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
-    color: '#374151',
-  },
+  completedInfoText: { fontSize: 12 },
+  moveChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, fontSize: 12 },
   moveRow: {
     flexDirection: 'row',
     gap: 8,
@@ -840,22 +837,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fee2e2',
     color: '#b91c1c',
   },
-  emptyCard: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+  emptyCard: { borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 8 },
   emptyCardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
     marginBottom: 4,
   },
   emptyCardSub: {
     fontSize: 12,
-    color: '#6b7280',
   },
   addTaskRow: {
     flexDirection: 'row',
@@ -897,16 +886,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  smallInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: 'white',
-    fontSize: 14,
-  },
+  smallInput: { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
   smallAddButton: {
     backgroundColor: '#6366f1',
     borderRadius: 8,
@@ -925,41 +905,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  modalCard: {
-    width: '100%',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  modalLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 6,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: 'white',
-  },
-  modalTextArea: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: 'white',
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
+  modalCard: { width: '100%', borderRadius: 12, padding: 16, borderWidth: 1 },
+  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
+  modalLabel: { fontSize: 12, marginBottom: 6 },
+  modalInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  modalTextArea: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, minHeight: 80, textAlignVertical: 'top' },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

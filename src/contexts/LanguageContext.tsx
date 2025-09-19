@@ -71,6 +71,9 @@ const translations = {
       language: 'Language',
       english: 'English',
       norwegian: 'Norwegian',
+      appearance: 'Appearance',
+      dark: 'Dark',
+      light: 'Light',
     },
     // Added keys
     admin: {
@@ -114,6 +117,7 @@ const translations = {
       labelDescription: 'Description (optional)',
       labelDate: 'Date (optional)',
       labelTime: 'Time (optional)',
+      labelImportance: 'Importance (optional)',
       sendBoard: 'Send Board',
       columnSent: 'Column snapshot sent',
       boardFinished: 'Board snapshot taken and tasks reset',
@@ -182,6 +186,9 @@ const translations = {
       language: 'Språk',
       english: 'Engelsk',
       norwegian: 'Norsk',
+      appearance: 'Utseende',
+      dark: 'Mørk',
+      light: 'Lys',
     },
     // Added keys
     admin: {
@@ -224,6 +231,7 @@ const translations = {
       labelDescription: 'Beskrivelse (valgfritt)',
       labelDate: 'Dato (valgfritt)',
       labelTime: 'Tid (valgfritt)',
+      labelImportance: 'Viktighet (valgfritt)',
       sendBoard: 'Send tavle',
       columnSent: 'Kolonne sendt',
       boardFinished: 'Tavle sendt og oppgaver nullstilt',

@@ -6,6 +6,8 @@ import { ColumnSnapshot, TaskSnapshot } from '../../types';
 import { getSnapshotById, getSnapshotColumns, getSnapshotTasks } from '../../utils/storage';
 import { supabase } from '../../../lib/supabase';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../contexts/ThemeContext';
 
 type SnapshotRouteProp = RouteProp<{ Snapshot: { snapshotId: string } }, 'Snapshot'>;
 
@@ -13,6 +15,7 @@ export default function SnapshotScreen() {
   const route = useRoute<SnapshotRouteProp>();
   const navigation = useNavigation<any>();
   const { t } = useLanguage();
+  const { theme, isDark } = useTheme();
   const snapshotId = route.params.snapshotId;
 
   const [title, setTitle] = useState('');
@@ -100,22 +103,22 @@ export default function SnapshotScreen() {
   }, [columns, tasks]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <LinearGradient colors={[theme.colors.primary, theme.colors.primaryAlt]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
-          <Text style={styles.headerBackIcon}>←</Text>
+          <Text style={[styles.headerBackIcon, { color: 'white' }]}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <Text style={styles.headerMeta}>{finishedOn}</Text>
-      </View>
+        <Text style={[styles.headerTitle, { color: 'white' }]}>{title}</Text>
+        <Text style={[styles.headerMeta, { color: 'rgba(255,255,255,0.85)' }]}>{finishedOn}</Text>
+      </LinearGradient>
 
       <ScrollView horizontal contentContainerStyle={styles.columnsContainer}>
         {columns.map(col => (
-          <View key={col.id} style={styles.column}>
+          <View key={col.id} style={[styles.column, { backgroundColor: theme.colors.card }]}>
             <View style={styles.columnHeader}>
-              <Text style={styles.columnTitle}>{col.title}</Text>
-              <View style={styles.countPill}>
-                <Text style={styles.countPillText}>{(tasksByColumn[col.originalColumnId] || []).filter(t => t.completed).length}/{(tasksByColumn[col.originalColumnId] || []).length}</Text>
+              <Text style={[styles.columnTitle, { color: theme.colors.text }]}>{col.title}</Text>
+              <View style={[styles.countPill, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
+                <Text style={[styles.countPillText, { color: theme.colors.secondaryText }]}>{(tasksByColumn[col.originalColumnId] || []).filter(t => t.completed).length}/{(tasksByColumn[col.originalColumnId] || []).length}</Text>
               </View>
             </View>
             <ScrollView
@@ -124,15 +127,33 @@ export default function SnapshotScreen() {
           showsVerticalScrollIndicator={false}
         >
             {(tasksByColumn[col.originalColumnId] || []).length === 0 ? (
-              <View style={styles.emptyCard}><Text style={styles.emptyCardText}>{t.snapshot.noTasksInSnapshot}</Text></View>
+              <View style={[styles.emptyCard, { backgroundColor: isDark ? '#0f172a' : '#f9fafb' }]}><Text style={[styles.emptyCardText, { color: theme.colors.secondaryText }]}>{t.snapshot.noTasksInSnapshot}</Text></View>
             ) : (
-              (tasksByColumn[col.originalColumnId] || []).map(task => (
-                <View key={task.id} style={[styles.taskCard, task.completed && styles.taskCardDone]}>
-                  <Text style={[styles.taskTitle, task.completed && styles.taskTitleDone]}>{task.title}</Text>
-                  {task.description ? <Text style={styles.taskDesc}>{task.description}</Text> : null}
+              (tasksByColumn[col.originalColumnId] || []).map(task => {
+                const isColored = !!task.importanceColor && !task.completed;
+                const cardBg = task.completed
+                  ? (isDark ? '#064e3b' : '#ecfdf5')
+                  : (task.importanceColor || (isDark ? '#111827' : '#f9fafb'));
+                const getContrastingTextColor = (hex?: string): string => {
+                  if (!hex) return theme.colors.text;
+                  const c = hex.replace('#', '');
+                  const r = parseInt(c.substring(0, 2), 16);
+                  const g = parseInt(c.substring(2, 4), 16);
+                  const b = parseInt(c.substring(4, 6), 16);
+                  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                  return luminance > 0.6 ? '#111827' : '#FFFFFF';
+                };
+                const textOnBg = isColored ? getContrastingTextColor(task.importanceColor || undefined) : theme.colors.text;
+                const secondaryOnBg = isColored ? (textOnBg === '#FFFFFF' ? 'rgba(255,255,255,0.9)' : '#374151') : theme.colors.secondaryText;
+                const chipBg = isColored ? (textOnBg === '#FFFFFF' ? 'rgba(255,255,255,0.25)' : 'rgba(17,24,39,0.08)') : (isDark ? '#1f2937' : '#f3f4f6');
+                const chipText = isColored ? (textOnBg === '#FFFFFF' ? '#FFFFFF' : '#374151') : theme.colors.secondaryText;
+                return (
+                <View key={task.id} style={[styles.taskCard, { backgroundColor: cardBg }]}>
+                  <Text style={[styles.taskTitle, { color: task.completed ? '#065f46' : textOnBg }, task.completed && styles.taskTitleDone]}>{task.title}</Text>
+                  {task.description ? <Text style={[styles.taskDesc, { color: task.completed ? '#065f46' : secondaryOnBg }]}>{task.description}</Text> : null}
                   <View style={styles.taskMetaRow}>
                     {(task.dueDate || task.dueTime) ? (
-                      <Text style={styles.dueDateText}>
+                      <Text style={[styles.dueDateText, { backgroundColor: chipBg, color: chipText }]}>
                         {[
                           task.dueDate ? formatISOForDisplayNO(task.dueDate) : undefined,
                           task.dueTime ? formatDueTime(task.dueTime) : undefined,
@@ -155,7 +176,7 @@ export default function SnapshotScreen() {
                     )}
                     </View>
                 </View>
-              ))
+              );})
             )}
             </ScrollView>
           </View>
@@ -166,45 +187,32 @@ export default function SnapshotScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
+  container: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 0, borderBottomColor: 'transparent' },
   headerBack: { marginBottom: 6 },
-  headerBackIcon: { fontSize: 18, color: '#4f46e5' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937' },
-  headerMeta: { color: '#6b7280', marginTop: 4 },
+  headerBackIcon: { fontSize: 18 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerMeta: { marginTop: 4 },
   columnsContainer: { padding: 16, flexDirection: 'row', gap: 12 },
-  column: { width: 280, backgroundColor: 'white', borderRadius: 12, padding: 12, elevation: 2 },
+  column: { width: 280, borderRadius: 12, padding: 12, elevation: 2 },
   columnHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  columnTitle: { fontSize: 16, fontWeight: '700', color: '#1f2937' },
-  countPill: { backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
-  countPillText: { fontSize: 12, color: '#4b5563', fontWeight: '600' },
-  taskCard: { backgroundColor: '#f9fafb', borderRadius: 8, padding: 10, marginBottom: 8 },
+  columnTitle: { fontSize: 16, fontWeight: '700' },
+  countPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  countPillText: { fontSize: 12, fontWeight: '600' },
+  taskCard: { borderRadius: 8, padding: 10, marginBottom: 8 },
   taskCardDone: { backgroundColor: '#ecfdf5' },
-  taskTitle: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  taskTitle: { fontSize: 14, fontWeight: '600' },
   taskTitleDone: { textDecorationLine: 'line-through', color: '#065f46' },
-  taskDesc: { fontSize: 12, color: '#6b7280', marginTop: 4 },
+  taskDesc: { fontSize: 12, marginTop: 4 },
   taskMetaRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
   badge: { fontSize: 12, backgroundColor: '#e5e7eb', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, color: '#374151' },
   badgeTodo: { backgroundColor: '#6366f1', color: 'white' },
   badgeDone: { backgroundColor: '#10b981', color: 'white' },
   completedRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   completedAvatar: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#e5e7eb' },
-  dueDateText: {
-    fontSize: 12,
-    color: '#4b5563',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 999,
-  },
-  emptyCard: { backgroundColor: '#f9fafb', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 8 },
-  emptyCardText: { color: '#6b7280' },
+  dueDateText: { fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  emptyCard: { borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 8 },
+  emptyCardText: { },
 });
 
 

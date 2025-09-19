@@ -7,10 +7,15 @@ import { getOrganizationById } from '../../utils/storage';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import AnimatedTitle from '../../../components/AnimatedTitle';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../contexts/ThemeContext';
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { t, language, setLanguage } = useLanguage();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [inviteCode, setInviteCode] = useState<string>('');
   const [members, setMembers] = useState<Array<{ id: string; name: string; email: string; is_admin: boolean; avatar_url?: string }>>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -137,14 +142,20 @@ export default function ProfileScreen() {
   if (!user) return null;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <AnimatedTitle text={t.settings.title} style={styles.headerTitle} />
-      </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <LinearGradient
+        colors={[theme.colors.primary, theme.colors.primaryAlt]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <AnimatedTitle text={t.settings.title} style={[styles.headerTitle, { color: 'white' }]} />
+      </LinearGradient>
 
       <View style={styles.content}>
+        <ScrollView>
         {/* User Profile */}
-        <View style={styles.profileCard}>
+        <Card style={[styles.profileCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           <TouchableOpacity onPress={handleChangeAvatar} activeOpacity={0.8}>
             <View style={styles.avatar}>
               {avatarUrl ? (
@@ -161,49 +172,56 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user.name}</Text>
-            <Text style={styles.profileEmail}>{user.email}</Text>
+            <Text style={[styles.profileName, { color: theme.colors.text }]}>{user.name}</Text>
+            <Text style={[styles.profileEmail, { color: theme.colors.secondaryText }]}>{user.email}</Text>
             <Text style={styles.profileRole}>
               {user.role === 'admin' ? t.auth.admin : t.auth.employee}
             </Text>
           </View>
-        </View>
+        </Card>
 
         {/* Settings */}
-        <View style={styles.settingsSection}>
+        <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <TouchableOpacity style={styles.settingItem} onPress={toggleLanguage}>
-            <Text style={styles.settingLabel}>{t.settings.language}</Text>
-            <Text style={styles.settingValue}>
+            <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.settings.language}</Text>
+            <Text style={[styles.settingValue, { color: theme.colors.primary }]}>
               {language === 'en' ? t.settings.english : t.settings.norwegian}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
+            <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.settings.appearance}</Text>
+            <Text style={[styles.settingValue, { color: theme.colors.primary }]}>
+              {isDark ? t.settings.dark : t.settings.light}
             </Text>
           </TouchableOpacity>
 
           {user.role === 'admin' && (
             <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>{t.profile.inviteCode}</Text>
+              <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.profile.inviteCode}</Text>
               <TouchableOpacity onPress={() => { if (inviteCode) { Alert.alert(t.profile.inviteCode, inviteCode); } }}>
-                <Text style={[styles.settingValue, { textDecorationLine: 'underline' }]}>{inviteCode || '-'}</Text>
+                <Text style={[styles.settingValue, { textDecorationLine: 'underline', color: theme.colors.primary }]}>{inviteCode || '-'}</Text>
               </TouchableOpacity>
             </View>
           )}
 
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutText}>{t.common.logout}</Text>
+            <Text style={[styles.logoutText, { color: theme.colors.error }]}>{t.common.logout}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Organization Members (Admins) */}
         {user.role === 'admin' && (
-          <View style={styles.membersCard}>
+          <View style={[styles.membersCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <View style={styles.membersHeader}>
-              <Text style={styles.membersTitle}>{t.profile.organizationMembers}</Text>
+              <Text style={[styles.membersTitle, { color: theme.colors.text }]}>{t.profile.organizationMembers}</Text>
               <Text style={styles.membersCount}>{members.length}</Text>
             </View>
             <ScrollView>
             {membersLoading ? (
-              <Text style={styles.membersLoading}>{t.profile.loading}</Text>
+              <Text style={[styles.membersLoading, { color: theme.colors.secondaryText }]}>{t.profile.loading}</Text>
             ) : members.length === 0 ? (
-              <Text style={styles.membersEmpty}>{t.profile.noMembersYet}</Text>
+              <Text style={[styles.membersEmpty, { color: theme.colors.secondaryText }]}>{t.profile.noMembersYet}</Text>
             ) : (
               <View>
                 {members.map(m => (
@@ -212,14 +230,14 @@ export default function ProfileScreen() {
                       {m.avatar_url ? (
                         <Image source={{ uri: m.avatar_url }} style={{ width: 36, height: 36, borderRadius: 18 }} />
                       ) : (
-                        <Text style={styles.memberAvatarText}>
+                        <Text style={[styles.memberAvatarText, { color: theme.colors.text }]}>
                           {(m.name || m.email).split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                         </Text>
                       )}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.memberName}>{m.name}</Text>
-                      <Text style={styles.memberEmail}>{m.email}</Text>
+                      <Text style={[styles.memberName, { color: theme.colors.text }]}>{m.name}</Text>
+                      <Text style={[styles.memberEmail, { color: theme.colors.secondaryText }]}>{m.email}</Text>
                     </View>
                     <Text style={[styles.memberRole, m.is_admin && { color: '#4f46e5' }]}>{m.is_admin ? t.auth.admin : t.auth.employee}</Text>
                   </View>
@@ -231,10 +249,7 @@ export default function ProfileScreen() {
         )}
 
         {/* App Info */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>{t.dashboard.title}</Text>
-          <Text style={styles.footerSubtext}>{t.profile.version} 1.0.0</Text>
-        </View>
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -243,36 +258,27 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   header: {
-    backgroundColor: 'white',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingVertical: 24,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1f2937',
   },
   content: {
     flex: 1,
     padding: 20,
   },
   profileCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   avatar: {
     width: 60,
@@ -294,12 +300,10 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1f2937',
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 16,
-    color: '#6b7280',
     marginBottom: 4,
   },
   profileRole: {
@@ -308,15 +312,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   settingsSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   settingItem: {
     flexDirection: 'row',
@@ -329,12 +327,10 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 16,
-    color: '#1f2937',
     fontWeight: '500',
   },
   settingValue: {
     fontSize: 16,
-    color: '#6366f1',
   },
   logoutButton: {
     paddingHorizontal: 20,
@@ -343,7 +339,6 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 16,
-    color: '#ef4444',
     fontWeight: '600',
   },
   footer: {
@@ -353,24 +348,15 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6b7280',
   },
   footerSubtext: {
     fontSize: 14,
-    color: '#9ca3af',
     marginTop: 4,
   },
   membersCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginTop: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    
   },
   membersHeader: {
     flexDirection: 'row',
@@ -381,7 +367,6 @@ const styles = StyleSheet.create({
   membersTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1f2937',
   },
   membersCount: {
     backgroundColor: '#eef2ff',
@@ -415,15 +400,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   memberAvatarText: {
-    color: '#374151',
     fontWeight: '700',
   },
   memberName: {
-    color: '#111827',
     fontWeight: '600',
   },
   memberEmail: {
-    color: '#6b7280',
     fontSize: 12,
   },
   memberRole: {

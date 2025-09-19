@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, ActivityIndicator, Text } from 'react-native';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, MainTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -24,12 +25,29 @@ const MainTab = createBottomTabNavigator();
 function MainTabNavigator() {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { theme, isDark } = useTheme();
   return (
     <MainTab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#6366f1',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.muted,
+        tabBarStyle: {
+          backgroundColor: theme.colors.tabBar,
+          borderTopColor: theme.colors.border,
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          borderRadius: 16,
+          paddingBottom: 6,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          marginBottom: 6,
+        },
+        tabBarIconStyle: {
+          marginTop: 6,
+        },
       }}
     >
       <MainTab.Screen 
@@ -80,6 +98,7 @@ function LoadingScreen() {
 
 export default function AppNavigator() {
   const { user, isLoading } = useAuth();
+  const { theme, isDark } = useTheme();
 
   // Auto-finish daily at app start (acts as a fallback if cron isn't running)
   // Daily auto-finish removed as per new requirements
@@ -88,8 +107,27 @@ export default function AppNavigator() {
     return <LoadingScreen />;
   }
 
+  const baseNavTheme = isDark ? DarkTheme : DefaultTheme;
+  const fonts = (baseNavTheme as any).fonts || {
+    regular: { fontFamily: 'System', fontWeight: '400' as const },
+    medium: { fontFamily: 'System', fontWeight: '500' as const },
+    bold: { fontFamily: 'System', fontWeight: '700' as const },
+  };
+  const navTheme = {
+    ...baseNavTheme,
+    colors: {
+      ...baseNavTheme.colors,
+      background: theme.colors.background,
+      card: theme.colors.surface,
+      text: theme.colors.text,
+      border: theme.colors.border,
+      primary: theme.colors.primary,
+    },
+    fonts,
+  } as const;
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme as any}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
           <>
