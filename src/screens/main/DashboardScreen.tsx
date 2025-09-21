@@ -4,13 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Board } from '../../types';
-import { getBoardsByOrganizationId, createBoard } from '../../utils/storage';
+import { getBoardsByOrganizationId, createBoard, deleteBoard } from '../../utils/storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AnimatedTitle from '../../../components/AnimatedTitle';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../contexts/ThemeContext';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import { Swipeable } from 'react-native-gesture-handler';
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -46,6 +47,35 @@ export default function DashboardScreen() {
     }
   };
 
+  const handleDeleteBoard = async (boardId: string, title: string) => {
+    if (!user || user.role !== 'admin') {
+      Alert.alert(t.common.error, t.dashboard.notAuthorizedDeleteBoard);
+      return;
+    }
+    Alert.alert(t.dashboard.deleteBoardTitle, `${t.dashboard.deleteBoardMessage} "${title}".`,
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.common.delete,
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Use the deleteBoard function from storage.ts
+              // Assuming it's available and imported, if not, it needs to be added.
+              // For now, I'll add a placeholder. It needs to be imported from `../../utils/storage`.
+              // I'll add the import for deleteBoard later, after confirming the existence.
+              await deleteBoard(boardId);
+              await loadBoards();
+            } catch (e: any) {
+              console.error('Delete board error:', e);
+              Alert.alert(t.common.error, e?.message || t.dashboard.unableDeleteBoard);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <LinearGradient
@@ -78,17 +108,28 @@ export default function DashboardScreen() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingVertical: 16 }}
               renderItem={({ item }) => (
-                <TouchableOpacity onPress={() => navigation.navigate('Board', { boardId: item.id })}>
-                  <Card style={[styles.boardItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}> 
-                    <Text style={[styles.boardTitle, { color: theme.colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.boardMeta, { color: theme.colors.secondaryText }]}>{t.dashboard.created}: {new Date(item.createdAt).toLocaleDateString()}</Text>
-                  </Card>
-                </TouchableOpacity>
+                <Swipeable
+                  renderRightActions={() => (
+                    <TouchableOpacity onPress={() => handleDeleteBoard(item.id, item.title)}>
+                      <View style={styles.deleteButton}>
+                        <Text style={styles.deleteButtonText}>{t.dashboard.delete}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                >
+                  <TouchableOpacity onPress={() => navigation.navigate('Board', { boardId: item.id })}>
+                    <Card style={[styles.boardItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}> 
+                      <Text style={[styles.boardTitle, { color: theme.colors.text }]}>{item.title}</Text>
+                      <Text style={[styles.boardMeta, { color: theme.colors.secondaryText }]}>{t.dashboard.created}: {new Date(item.createdAt).toLocaleDateString()}</Text>
+                    </Card>
+                  </TouchableOpacity>
+                </Swipeable>
               )}
               ListFooterComponent={user?.role === 'admin' ? (
                 <Button title={t.dashboard.createBoard} onPress={handleCreateBoard} style={{ marginTop: 16, alignSelf: 'center' }} />
               ) : null}
             />
+            <Text style={[styles.swipeHint, { color: theme.colors.secondaryText }]}>{t.common.swipeToDelete}</Text>
           </View>
         )}
       </View>
@@ -145,5 +186,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  deleteButton: {
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 16,
+    marginBottom: 12,
+    marginRight: 20, // Align with board items' marginHorizontal
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  swipeHint: {
+    textAlign: 'center',
+    marginTop: 10,
+    fontSize: 12,
+    marginBottom: 60,
   },
 });

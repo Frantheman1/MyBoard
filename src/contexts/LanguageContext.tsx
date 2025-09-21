@@ -36,6 +36,7 @@ const translations = {
     dashboard: {
       title: 'MyBoard',
       yourBoards: 'Your Boards',
+      delete: 'Delete',
       createBoard: 'Create Board',
       noBoardsYet: 'No boards yet',
       noBoardsAdmin: 'Create your first board to start organizing tasks',
@@ -49,6 +50,7 @@ const translations = {
     common: {
       cancel: 'Cancel',
       create: 'Create',
+      swipeToDelete: 'Swipe to delete a board',
       back: 'Back',
       logout: 'Logout',
       settings: 'Settings',
@@ -272,6 +274,7 @@ const translations = {
     dashboard: {
       title: 'MyBoard',
       yourBoards: 'Dine tavler',
+      delete: 'Slett',
       createBoard: 'Opprett tavle',
       noBoardsYet: 'Ingen tavler ennå',
       noBoardsAdmin: 'Opprett din første tavle for å organisere oppgaver',
@@ -285,6 +288,7 @@ const translations = {
     common: {
       cancel: 'Avbryt',
       create: 'Opprett',
+      swipeToDelete: 'Sveip for å slette tavle',
       back: 'Tilbake',
       logout: 'Logg ut',
       settings: 'Innstillinger',

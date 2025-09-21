@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.myboardapp.myboard",
-      "buildNumber": "1.0.2",
+      "buildNumber": "1.0.4",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "We use your photo to set your profile picture.",
         "NSCameraUsageDescription": "Allow camera to take a profile photo.",

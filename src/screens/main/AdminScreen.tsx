@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ScrollView } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
@@ -103,7 +103,7 @@ export default function AdminScreen() {
         <AnimatedTitle text={t.admin.title} style={[styles.headerTitle, { color: 'white' }]} />
       </LinearGradient>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         {renderSectionHeader(t.admin.boards, activeBoards.length, () => setIsBoardsOpen(prev => !prev), isBoardsOpen)}
         {isBoardsOpen && (activeBoards.length === 0 ? (
           <View style={styles.emptyState}><Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>{t.admin.noBoards}</Text></View>
@@ -113,6 +113,7 @@ export default function AdminScreen() {
             keyExtractor={(b) => b.id}
             renderItem={({ item }) => renderBoardItem(item)}
             contentContainerStyle={{ paddingBottom: 12 }}
+            scrollEnabled={false} // Disable FlatList's internal scroll to allow parent ScrollView to handle it
           />
         ))}
 
@@ -151,9 +152,10 @@ export default function AdminScreen() {
                 </Card>
               </Swipeable>
             )}
+            scrollEnabled={false} // Disable FlatList's internal scroll to allow parent ScrollView to handle it
           />
         ))}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -163,7 +165,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingVertical: 20, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   chevron: { fontSize: 18 },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  content: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  content: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 50, gap: 10 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 6 },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
   countPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },

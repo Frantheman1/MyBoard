@@ -367,41 +367,22 @@ export default function BoardScreen() {
     );
   };
 
-  const handleDeleteBoard = async () => {
-    if (!isAdmin) return;
-    Alert.alert(t.dashboard.deleteBoardTitle, t.dashboard.deleteBoardMessage, [
-      { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.common.delete,
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteBoard(boardId);
-            navigation.goBack();
-          } catch (e: any) {
-            console.error('Delete board error:', e);
-            Alert.alert(t.common.error, e?.message || 'Unable to delete board');
-          }
-        }
-      }
-    ]);
-  };
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <LinearGradient colors={[theme.colors.primary, theme.colors.primaryAlt]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
           <Text style={[styles.headerBackIcon, { color: 'white' }]}>←</Text>
         </TouchableOpacity>
-        <AnimatedTitle text={boardTitle} style={[styles.headerTitle, { color: 'white' }]} />
+        <TouchableOpacity
+          onPress={isAdmin ? handleRenameBoard : undefined} // Only allow renaming if admin
+          activeOpacity={isAdmin ? 0.7 : 1} // Visual feedback only for admins
+        >
+          <AnimatedTitle text={boardTitle} style={[styles.headerTitle, { color: 'white' }]} />
+        </TouchableOpacity>
         {isAdmin && (
           <View style={{ flexDirection: 'row', gap: 16 }}>
-            <TouchableOpacity onPress={handleRenameBoard}>
-              <Text style={[styles.headerAction, { color: 'white' }]}>{t.common.edit}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleDeleteBoard}>
-              <Text style={[styles.headerActionDanger, { color: 'black' }]}>{t.common.delete}</Text>
-            </TouchableOpacity>
+            {/* The rename button is removed, clicking the title now handles it */}
+            {/* The delete button is moved to DashboardScreen via swipeable action */}
           </View>
         )}
       </LinearGradient>
