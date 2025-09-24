@@ -22,47 +22,43 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    let active = true;
     const load = async () => {
       if (!user) return;
       const org = await getOrganizationById(user.organizationId);
-      setInviteCode(org?.inviteCode || '');
-      // Fetch current user's avatar
-      try {
-        const { data: me } = await supabase
-          .from('profiles')
-          .select('avatar_url')
-          .eq('id', user.id)
-          .single();
-        if (me?.avatar_url) setAvatarUrl(me.avatar_url as string);
-      } catch {}
-
+      if (!active) return; setInviteCode(org?.inviteCode || '');
+  
+      // avatar/me
+      const { data: me } = await supabase.from('profiles').select('avatar_url').eq('id', user.id).single();
+      if (!active) return; if (me?.avatar_url) setAvatarUrl(me.avatar_url as string);
+  
       if (user.role === 'admin' && user.organizationId) {
         setMembersLoading(true);
         try {
-          const { data, error } = await supabase
+          const { data } = await supabase
             .from('profiles')
             .select('id, name, email, is_admin, organization_id, avatar_url')
             .eq('organization_id', user.organizationId)
             .order('name', { ascending: true });
-          if (!error && data) {
-            const mapped = data.map((p: any) => ({
-              id: p.id,
-              name: p.name || p.email,
-              email: p.email,
-              is_admin: !!p.is_admin,
-              avatar_url: p.avatar_url || undefined,
-            }));
-            setMembers(mapped);
-          }
+          if (!active) return;
+          setMembers((data || []).map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            is_admin: m.is_admin,
+            avatar_url: m.avatar_url,
+          })));
         } finally {
-          setMembersLoading(false);
+          if (active) setMembersLoading(false);
         }
       } else {
-        setMembers([]);
+        if (active) setMembers([]);
       }
     };
     load();
+    return () => { active = false; };
   }, [user?.organizationId]);
+  
 
   const handleChangeAvatar = async () => {
     if (!user) return;

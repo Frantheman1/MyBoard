@@ -27,14 +27,25 @@ export default function DashboardScreen() {
   };
 
   useEffect(() => {
-    loadBoards();
+    let active = true;
+    (async () => {
+      if (!user?.organizationId) return;
+      await loadBoards();     // inside load(), before each setState: if (!active) return;
+    })();
+    return () => { active = false; };
   }, [user?.organizationId]);
 
   useFocusEffect(
     useCallback(() => {
-      loadBoards();
+      let active = true;
+      (async () => {
+        if (!user?.organizationId) return;
+        await loadBoards();     // inside load(), before each setState: if (!active) return;
+      })();
+      return () => { active = false; };
     }, [user?.organizationId])
   );
+  
 
   const handleCreateBoard = async () => {
     if (!user) return;

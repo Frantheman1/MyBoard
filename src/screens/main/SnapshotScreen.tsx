@@ -109,7 +109,7 @@ export default function SnapshotScreen() {
           <Text style={[styles.headerBackIcon, { color: 'white' }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: 'white' }]}>{title}</Text>
-        <Text style={[styles.headerMeta, { color: 'rgba(255,255,255,0.85)' }]}>{finishedOn}</Text>
+        <Text style={[styles.headerMeta, { color: 'rgba(255,255,255,0.85)' }]}>{formatISOForDisplayNO(finishedOn)}</Text>
       </LinearGradient>
 
       <ScrollView horizontal contentContainerStyle={styles.columnsContainer}>

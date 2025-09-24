@@ -51,9 +51,14 @@ export default function AdminScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      let active = true;
+      (async () => {
+        if (!user?.organizationId) return;
+        await load();     // inside load(), before each setState: if (!active) return;
+      })();
+      return () => { active = false; };
     }, [user?.organizationId])
-  );
+  );  
 
   const formatDateTime = (iso?: string) => {
     if (!iso) return '';
@@ -64,6 +69,17 @@ export default function AdminScreen() {
       return `${date} ${time}`;
     } catch { return iso || ''; }
   };
+
+  const formatEUDate = (iso?: string) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      // Format: dd/mm/yyyy
+      return d.toLocaleDateString('en-GB'); 
+    } catch {
+      return iso || '';
+    }
+  };  
 
   const confirmFinishBoard = (board: Board) => {
     if (!isAdmin) return;
@@ -87,7 +103,7 @@ export default function AdminScreen() {
     <Card style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
       <View style={{ flex: 1 }}>
         <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{board.title}</Text>
-        <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.created}: {formatDateTime(board.createdAt)}</Text>
+        <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.created}: {formatEUDate(board.createdAt)}</Text>
       </View>
       {isAdmin && (
         <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]} onPress={() => confirmFinishBoard(board)}>
@@ -143,7 +159,7 @@ export default function AdminScreen() {
                 <Card style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.finishedOn}: {item.finishedOn}</Text>
+                    <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.finishedOn}: {formatEUDate(item.finishedOn)}</Text>
                     <Text style={[styles.cardSubtitle, { marginTop: 2, color: theme.colors.secondaryText }]}>{t.admin.by}: {item.submittedBy ? (profileNames[item.submittedBy] || item.submittedBy) : t.common.unknown}</Text>
                   </View>
                   <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]} onPress={() => navigation.navigate('Snapshot', { snapshotId: item.id })}>

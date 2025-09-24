@@ -126,7 +126,12 @@ export default function BoardScreen() {
   };
 
   useEffect(() => {
-    load();
+    let active = true;
+    (async () => {
+      if (!boardId) return;
+      await load();     // inside load(), before each setState: if (!active) return;
+    })();
+    return () => { active = false; };
   }, [boardId]);
 
   // Load profiles for users who completed tasks so we can show avatar/name

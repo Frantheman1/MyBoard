@@ -100,18 +100,13 @@ export default function AppNavigator() {
   const { user, isLoading } = useAuth();
   const { theme, isDark } = useTheme();
 
-  // Auto-finish daily at app start (acts as a fallback if cron isn't running)
-  // Daily auto-finish removed as per new requirements
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
+  if (isLoading) return <LoadingScreen />;
 
   const baseNavTheme = isDark ? DarkTheme : DefaultTheme;
   const fonts = (baseNavTheme as any).fonts || {
     regular: { fontFamily: 'System', fontWeight: '400' as const },
-    medium: { fontFamily: 'System', fontWeight: '500' as const },
-    bold: { fontFamily: 'System', fontWeight: '700' as const },
+    medium:  { fontFamily: 'System', fontWeight: '500' as const },
+    bold:    { fontFamily: 'System', fontWeight: '700' as const },
   };
   const navTheme = {
     ...baseNavTheme,
@@ -127,25 +122,13 @@ export default function AppNavigator() {
   } as const;
 
   return (
-    <NavigationContainer theme={navTheme as any}>
+    <NavigationContainer theme={navTheme as any} key={user ? 'app' : 'auth'}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
           <>
             <RootStack.Screen name="Main" component={MainTabNavigator} />
-            <RootStack.Screen 
-              name="Board" 
-              component={BoardScreen} 
-              options={{
-                headerShown: false,
-                gestureEnabled: true,
-                gestureDirection: 'horizontal',
-              }}
-            />
-            <RootStack.Screen 
-              name="Snapshot" 
-              component={SnapshotScreen}
-              options={{ headerShown: false }}
-            />
+            <RootStack.Screen name="Board" component={BoardScreen} />
+            <RootStack.Screen name="Snapshot" component={SnapshotScreen} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={LoginScreen} />
