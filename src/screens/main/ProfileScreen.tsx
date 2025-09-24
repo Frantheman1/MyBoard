@@ -11,6 +11,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../contexts/ThemeContext';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../types';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -20,6 +24,7 @@ export default function ProfileScreen() {
   const [members, setMembers] = useState<Array<{ id: string; name: string; email: string; is_admin: boolean; avatar_url?: string }>>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
     let active = true;
@@ -124,7 +129,9 @@ export default function ProfileScreen() {
         {
           text: t.common.logout,
           style: 'destructive',
-          onPress: logout,
+          onPress: () => {
+            setTimeout(logout, 100); // Introduce a small delay to allow the alert to dismiss properly
+          },
         },
       ]
     );
@@ -149,7 +156,10 @@ export default function ProfileScreen() {
       </LinearGradient>
 
       <View style={styles.content}>
-        <ScrollView>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}   // 👈 hides the scrollbar
+        >
         {/* User Profile */}
         <Card style={[styles.profileCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           <TouchableOpacity onPress={handleChangeAvatar} activeOpacity={0.8}>
@@ -203,6 +213,14 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={[styles.logoutText, { color: theme.colors.error }]}>{t.common.logout}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Help & How it works */}
+        <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, marginTop: 24 }]}>
+          <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate(user.role === 'admin' ? 'AdminHelp' : 'UserHelp')}>
+            <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.settings.helpAndHowItWorks}</Text>
+            <Ionicons name="help-circle-outline" size={24} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -267,7 +285,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: 15,
   },
   profileCard: {
     borderRadius: 16,

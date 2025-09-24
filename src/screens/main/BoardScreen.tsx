@@ -392,11 +392,14 @@ export default function BoardScreen() {
         )}
       </LinearGradient>
 
-      <ScrollView horizontal contentContainerStyle={styles.columnsContainer}>
+      <ScrollView horizontal contentContainerStyle={styles.columnsContainer}
+        showsHorizontalScrollIndicator={false}
+      >
         {columns.map(col => (
               <ScrollView 
               key={col.id} 
               contentContainerStyle={{ paddingBottom: 20 }} 
+              showsVerticalScrollIndicator={false}
             >
           <View key={col.id} style={[styles.column, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <View style={styles.columnHeader}>

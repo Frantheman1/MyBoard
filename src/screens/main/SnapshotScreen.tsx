@@ -112,7 +112,9 @@ export default function SnapshotScreen() {
         <Text style={[styles.headerMeta, { color: 'rgba(255,255,255,0.85)' }]}>{formatISOForDisplayNO(finishedOn)}</Text>
       </LinearGradient>
 
-      <ScrollView horizontal contentContainerStyle={styles.columnsContainer}>
+      <ScrollView horizontal contentContainerStyle={styles.columnsContainer}
+      showsHorizontalScrollIndicator={false}
+      >
         {columns.map(col => (
           <View key={col.id} style={[styles.column, { backgroundColor: theme.colors.card }]}>
             <View style={styles.columnHeader}>

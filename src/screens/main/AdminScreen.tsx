@@ -119,7 +119,9 @@ export default function AdminScreen() {
         <AnimatedTitle text={t.admin.title} style={[styles.headerTitle, { color: 'white' }]} />
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      >
         {renderSectionHeader(t.admin.boards, activeBoards.length, () => setIsBoardsOpen(prev => !prev), isBoardsOpen)}
         {isBoardsOpen && (activeBoards.length === 0 ? (
           <View style={styles.emptyState}><Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>{t.admin.noBoards}</Text></View>

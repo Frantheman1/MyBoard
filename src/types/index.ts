@@ -106,6 +106,9 @@ export interface RootStackParamList {
   Board: { boardId: string };
   Settings: undefined;
   Snapshot: { snapshotId: string };
+  UserHelp: undefined;
+  AdminHelp: undefined;
+  [key: string]: undefined | object;
 }
 
 export interface MainTabParamList {

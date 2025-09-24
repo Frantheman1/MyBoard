@@ -76,6 +76,7 @@ const translations = {
       appearance: 'Appearance',
       dark: 'Dark',
       light: 'Light',
+      helpAndHowItWorks: 'Help & How it works',
     },
     // Added keys
     admin: {
@@ -157,6 +158,24 @@ const translations = {
       unableUpdateProfilePicture: 'Unable to update profile picture',
       version: 'Version',
     },
+    help: {
+      common: {
+        contactInfo: 'Contact Information',
+        contactEmail: 'Email: helpmytimeapp@gmail.com',
+      },
+      user: {
+        title: 'Help & How it works',
+        howItWorks: 'How MyBoard works',
+        howItWorksContent: 'MyBoard helps you manage your tasks efficiently. Create boards, add tasks, and track your progress. Drag and drop tasks between columns to update their status. Collaborate with your team by sharing boards.',
+      },
+      admin: {
+        title: 'Help & How it works',
+        howItWorks: 'How MyBoard works',
+        howItWorksContent: 'As an admin, you have full control over your organization\'s boards and members. Create, edit, and delete boards, manage user roles, and view historical snapshots of your boards. Invite new members using the organization invite code.',
+        managingUsers: 'Managing Users',
+        managingUsersContent: 'Admins can promote or demote users to employee/admin roles. This is done in the MyTime app, in settings under Organization Members.',
+      },
+    },
   },
   no: {
     auth: {
@@ -191,6 +210,7 @@ const translations = {
       appearance: 'Utseende',
       dark: 'Mørk',
       light: 'Lys',
+      helpAndHowItWorks: 'Hjelp og hvordan det fungerer',
     },
     // Added keys
     admin: {
@@ -301,6 +321,24 @@ const translations = {
       sent: 'Sendt',
       actions: 'Handlinger',
       someone: 'Noen',
+    },
+    help: {
+      common: {
+        contactInfo: 'Kontaktinformasjon',
+        contactEmail: 'E-post: helpmytimeapp@gmail.com',
+      },
+      user: {
+        title: 'Hjelp og hvordan det fungerer',
+        howItWorks: 'Hvordan MyBoard fungerer',
+        howItWorksContent: 'MyBoard hjelper deg med å administrere oppgavene dine effektivt. Opprett tavler, legg til oppgaver og spor fremdriften din. Dra og slipp oppgaver mellom kolonner for å oppdatere statusen deres. Samarbeid med teamet ditt ved å dele tavler.',
+      },
+      admin: {
+        title: 'Hjelp og hvordan det fungerer',
+        howItWorks: 'Hvordan MyBoard fungerer',
+        howItWorksContent: 'Som administrator har du full kontroll over organisasjonens tavler og medlemmer. Opprett, rediger og slett tavler, administrer brukerroller og se historiske øyeblikksbilder av tavlene dine. Inviter nye medlemmer med organisasjonens invitasjonskode.',
+        managingUsers: 'Administrere brukere',
+        managingUsersContent: 'Administratorer kan forfremme eller degradere brukere til ansatt-/administratorroller. Dette gjøres gjennom appen MyTime, i instillinger under Organisasjonsmedlemmer.',
+      },
     },
   }
 };

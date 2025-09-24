@@ -118,6 +118,7 @@ export default function DashboardScreen() {
               data={boards}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingVertical: 16 }}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <Swipeable
                   renderRightActions={() => (

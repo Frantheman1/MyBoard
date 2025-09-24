@@ -17,6 +17,8 @@ import AdminScreen from '../screens/main/AdminScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import BoardScreen from '../screens/main/BoardScreen';
 import SnapshotScreen from '../screens/main/SnapshotScreen';
+import UserHelpScreen from '../screens/help/UserHelpScreen';
+import AdminHelpScreen from '../screens/help/AdminHelpScreen';
 // removed daily auto-finish
 
 const RootStack = createStackNavigator();
@@ -129,6 +131,8 @@ export default function AppNavigator() {
             <RootStack.Screen name="Main" component={MainTabNavigator} />
             <RootStack.Screen name="Board" component={BoardScreen} />
             <RootStack.Screen name="Snapshot" component={SnapshotScreen} />
+            <RootStack.Screen name="UserHelp" component={UserHelpScreen} />
+            <RootStack.Screen name="AdminHelp" component={AdminHelpScreen} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={LoginScreen} />
