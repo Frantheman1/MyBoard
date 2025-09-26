@@ -17,7 +17,7 @@ import { RootStackParamList } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { theme, isDark, toggleTheme } = useTheme();
   const [inviteCode, setInviteCode] = useState<string>('');
@@ -62,7 +62,7 @@ export default function ProfileScreen() {
     };
     load();
     return () => { active = false; };
-  }, [user?.organizationId]);
+  }, [isLoading, user?.organizationId]);
   
 
   const handleChangeAvatar = async () => {
@@ -231,7 +231,7 @@ export default function ProfileScreen() {
               <Text style={[styles.membersTitle, { color: theme.colors.text }]}>{t.profile.organizationMembers}</Text>
               <Text style={styles.membersCount}>{members.length}</Text>
             </View>
-            <ScrollView>
+            <View>
             {membersLoading ? (
               <Text style={[styles.membersLoading, { color: theme.colors.secondaryText }]}>{t.profile.loading}</Text>
             ) : members.length === 0 ? (
@@ -258,7 +258,7 @@ export default function ProfileScreen() {
                 ))}
               </View>
             )}
-            </ScrollView>
+            </View>
           </View>
         )}
 

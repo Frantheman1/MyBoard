@@ -1,24 +1,23 @@
-// AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+// contexts/AuthContext.tsx
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
 import { User } from '../types';
 
-interface AuthContextType {
+type AuthContextType = {
   user: User | null;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  isLoading: boolean;
-}
+  isLoading: boolean; // true until we've processed the first real auth state
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [bootedFromCache, setBootedFromCache] = useState(false);
+  const [hydrated, setHydrated] = useState(false); // 👈 becomes true after first session resolve
 
-  // Map Supabase session -> your User shape
+  // Map Supabase profile row -> your app's User
   const mapProfileToUser = (profile: any): User => ({
     id: profile.id,
     name: profile.name ?? profile.email,
@@ -28,49 +27,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     createdAt: profile.created_at ?? new Date().toISOString(),
   });
 
-  // 1) Quick boot from cache (if any), so UI has something while we check session
+  // Persist user whenever it changes (single place)
   useEffect(() => {
     (async () => {
       try {
-        const cached = await AsyncStorage.getItem('myboard_user');
-        if (cached) {
-          setUser(JSON.parse(cached));
+        if (user) {
+          await AsyncStorage.setItem('myboard_user', JSON.stringify(user));
+        } else {
+          await AsyncStorage.removeItem('myboard_user');
         }
-      } finally {
-        setBootedFromCache(true);
-      }
+      } catch {}
     })();
-  }, []);
+  }, [user]);
 
-  // 2) Live auth listener is the single source of truth
   useEffect(() => {
-    let isActive = true;
+    let active = true;
 
-    const restoreFromSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!isActive) return;
-
-      if (session?.user?.id) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (!error && profile) setUser(mapProfileToUser(profile));
-        else setUser(null);
-      } else {
-        setUser(null);
-      }
-      setIsLoading(false);
-    };
-
-    // initial restore
-    restoreFromSession();
-
-    // subscribe to changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!isActive) return;
+    const applySession = async (session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']) => {
+      if (!active) return;
 
       if (session?.user?.id) {
         const { data: profile, error } = await supabase
@@ -79,50 +53,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq('id', session.user.id)
           .maybeSingle();
 
+        if (!active) return;
         setUser(!error && profile ? mapProfileToUser(profile) : null);
       } else {
         setUser(null);
       }
-      setIsLoading(false);
-    });
+
+      if (active) setHydrated(true); // ✅ mark ready after first *real* resolution
+    };
+
+    const bootstrap = async () => {
+      // Optional: show cached user instantly (for perceived performance)
+      try {
+        const cached = await AsyncStorage.getItem('myboard_user');
+        if (cached && active) setUser(JSON.parse(cached));
+      } catch {}
+
+      // 1) Resolve current session once
+      const { data: { session } } = await supabase.auth.getSession();
+      await applySession(session);
+
+      // 2) Subscribe to live auth changes (single source of truth)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        applySession(nextSession);
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    let cleanup: (() => void) | void;
+    bootstrap().then((c) => { cleanup = c; });
 
     return () => {
-      isActive = false;
-      subscription.unsubscribe();
+      active = false;
+      if (typeof cleanup === 'function') cleanup();
     };
   }, []);
 
-  // 3) Persist user whenever it changes (single place)
-  useEffect(() => {
-    (async () => {
-      if (user) {
-        await AsyncStorage.setItem('myboard_user', JSON.stringify(user));
-      } else {
-        await AsyncStorage.removeItem('myboard_user');
-      }
-    })();
-  }, [user]);
-
   const loginWithPassword = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      if (!data.user) throw new Error('No user');
-
-      // No setUser here — the auth listener will populate it once session is established.
-    } finally {
-      setIsLoading(false);
-    }
+    // Let the auth listener populate user; this is just the call.
+    await supabase.auth.signInWithPassword({ email, password });
   };
 
   const logout = async () => {
-    // Don’t call setUser(null) here — avoid bouncing state.
+    // Passive logout: listener will flip user to null.
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginWithPassword, logout, isLoading: isLoading && !bootedFromCache }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loginWithPassword,
+        logout,
+        isLoading: !hydrated, // expose as “auth not ready yet”
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -14,37 +14,40 @@ import Card from '../../components/ui/Card';
 import { Swipeable } from 'react-native-gesture-handler';
 
 export default function DashboardScreen() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { t } = useLanguage();
   const navigation = useNavigation<any>();
   const [boards, setBoards] = useState<Board[]>([]);
   const { theme } = useTheme();
 
-  const loadBoards = async () => {
+  const loadBoards = async (activeRef?: { current: boolean }) => {
     if (!user) return;
     const data = await getBoardsByOrganizationId(user.organizationId);
+    if (activeRef?.current === false) return;
     setBoards(data);
-  };
+    };
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      if (!user?.organizationId) return;
-      await loadBoards();     // inside load(), before each setState: if (!active) return;
-    })();
-    return () => { active = false; };
-  }, [user?.organizationId]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
+    useEffect(() => {
+      const active = { current: true };
       (async () => {
-        if (!user?.organizationId) return;
-        await loadBoards();     // inside load(), before each setState: if (!active) return;
+       if (isLoading) return;                // ✅ wait for auth
+       if (!user?.organizationId) return;
+       await loadBoards(active);
       })();
-      return () => { active = false; };
-    }, [user?.organizationId])
-  );
+      return () => { active.current = false; };
+      }, [isLoading, user?.organizationId]);
+
+      useFocusEffect(
+        useCallback(() => {
+          const active = { current: true };
+         (async () => {
+           if (isLoading) return;              // ✅
+             if (!user?.organizationId) return;
+             await loadBoards(active);
+           })();
+           return () => { active.current = false; };
+           }, [isLoading, user?.organizationId])
+        );
   
 
   const handleCreateBoard = async () => {

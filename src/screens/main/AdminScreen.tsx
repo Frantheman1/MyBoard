@@ -27,12 +27,14 @@ export default function AdminScreen() {
 
   const isAdmin = user?.role === 'admin';
 
-  const load = async () => {
+  const load = async (activeRef?: { current: boolean }) => {
     if (!user?.organizationId) return;
     const all = await getBoardsByOrganizationId(user.organizationId);
+    if (activeRef?.current === false) return; 
     setActiveBoards(all);
-    const snaps = await listSnapshotsByOrganization(user.organizationId);
-    setSnapshots(snaps);
+     const snaps = await listSnapshotsByOrganization(user.organizationId);
+     if (activeRef?.current === false) return; 
+     setSnapshots(snaps);
     const submitterIds = Array.from(new Set((snaps || []).map(s => s.submittedBy).filter(Boolean) as string[]));
     if (submitterIds.length > 0) {
       const { data } = await supabase
@@ -43,22 +45,22 @@ export default function AdminScreen() {
       for (const p of (data || []) as any[]) {
         map[p.id] = p.name || p.email;
       }
-      setProfileNames(map);
+      if (activeRef?.current === false) return; setProfileNames(map);
     } else {
-      setProfileNames({});
+        if (activeRef?.current === false) return; setProfileNames({});
     }
   };
 
   useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      (async () => {
-        if (!user?.organizationId) return;
-        await load();     // inside load(), before each setState: if (!active) return;
-      })();
-      return () => { active = false; };
-    }, [user?.organizationId])
-  );  
+       useCallback(() => {
+         const active = { current: true };
+         (async () => {
+           if (!user?.organizationId) return;
+           await load(active);
+         })();
+         return () => { active.current = false; };
+       }, [user?.organizationId])
+     ); 
 
   const formatDateTime = (iso?: string) => {
     if (!iso) return '';
