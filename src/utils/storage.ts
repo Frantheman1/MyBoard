@@ -9,6 +9,8 @@ const STORAGE_KEYS = {
   ORGS: 'myboard_organizations',
 } as const;
 
+const TASK_ORDER_PREFIX = 'myboard_task_order__'; // legacy local ordering (kept as fallback)
+
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
     const raw = await AsyncStorage.getItem(key);
@@ -69,6 +71,22 @@ export async function getBoardsByOrganizationId(organizationId: string): Promise
     .from('myboard_boards')
     .select('*')
     .eq('organization_id', organizationId)
+    .order('created_at', { ascending: true });
+  if (error || !data) return [];
+  return data.map((b: any) => ({
+    id: b.id,
+    title: b.title,
+    organizationId: b.organization_id,
+    finishedAt: b.finished_at || undefined,
+    createdAt: b.created_at,
+    createdBy: b.created_by,
+  }));
+}
+
+export async function getAllBoards(): Promise<Board[]> {
+  const { data, error } = await supabase
+    .from('myboard_boards')
+    .select('*')
     .order('created_at', { ascending: true });
   if (error || !data) return [];
   return data.map((b: any) => ({
@@ -187,6 +205,32 @@ export async function getColumnsByBoardId(boardId: string): Promise<Column[]> {
   }));
 }
 
+export async function getTaskById(taskId: string): Promise<Task | undefined> {
+  const { data, error } = await supabase
+    .from('myboard_tasks')
+    .select('*')
+    .eq('id', taskId)
+    .single();
+  if (error || !data) return undefined;
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description || undefined,
+    dueDate: data.due_date || undefined,
+    dueTime: data.due_time || undefined,
+    importanceColor: data.importance_color || undefined,
+    columnId: data.column_id,
+    boardId: data.board_id,
+    position: data.position ?? undefined,
+    completed: !!data.completed,
+    completedAt: data.completed_at || undefined,
+    completedBy: data.completed_by || undefined,
+    createdAt: data.created_at,
+    createdBy: data.created_by,
+    allowed_weekdays: data.allowed_weekdays || undefined,
+  };
+}
+
 export async function createColumn(boardId: string, title: string): Promise<Column> {
   // Compute next position
   const { data: existing } = await supabase
@@ -240,9 +284,10 @@ export async function getTasksByBoardId(boardId: string): Promise<Task[]> {
     .from('myboard_tasks')
     .select('*')
     .eq('board_id', boardId)
+    .order('position', { ascending: true, nullsFirst: true })
     .order('created_at', { ascending: true });
   if (error || !data) return [];
-  return data.map((t: any) => ({
+  const mapped: Task[] = data.map((t: any) => ({
     id: t.id,
     title: t.title,
     description: t.description || undefined,
@@ -251,12 +296,56 @@ export async function getTasksByBoardId(boardId: string): Promise<Task[]> {
     importanceColor: t.importance_color || undefined,
     columnId: t.column_id,
     boardId: t.board_id,
+    position: t.position ?? undefined,
     completed: !!t.completed,
     completedAt: t.completed_at || undefined,
     completedBy: t.completed_by || undefined,
     createdAt: t.created_at,
     createdBy: t.created_by,
+    allowed_weekdays: t.allowed_weekdays || undefined,
   }));
+  // Apply local per-column ordering only if server has no positions for that column
+  const tasksByColumn: Record<string, Task[]> = {};
+  for (const t of mapped) {
+    (tasksByColumn[t.columnId] = tasksByColumn[t.columnId] || []).push(t);
+  }
+  const ordered: Task[] = [];
+  for (const [columnId, list] of Object.entries(tasksByColumn)) {
+    const hasPositions = list.some(t => typeof t.position === 'number');
+    if (hasPositions) {
+      const withPos = [...list].sort((a, b) => {
+        const ap = typeof a.position === 'number' ? a.position as number : Number.MAX_SAFE_INTEGER;
+        const bp = typeof b.position === 'number' ? b.position as number : Number.MAX_SAFE_INTEGER;
+        if (ap !== bp) return ap - bp;
+        return a.createdAt.localeCompare(b.createdAt);
+      });
+      ordered.push(...withPos);
+      continue;
+    }
+    const key = `${TASK_ORDER_PREFIX}${columnId}`;
+    let orderIds: string[] | undefined;
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      orderIds = raw ? (JSON.parse(raw) as string[]) : undefined;
+    } catch {}
+    if (orderIds && orderIds.length > 0) {
+      const idToTask: Record<string, Task> = {};
+      for (const t of list) idToTask[t.id] = t;
+      const seen = new Set<string>();
+      for (const id of orderIds) {
+        if (idToTask[id]) {
+          ordered.push(idToTask[id]);
+          seen.add(id);
+        }
+      }
+      for (const t of list) if (!seen.has(t.id)) ordered.push(t);
+    } else {
+      // fallback to createdAt order
+      list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      ordered.push(...list);
+    }
+  }
+  return ordered;
 }
 
 export async function getTasksByColumnId(columnId: string): Promise<Task[]> {
@@ -264,9 +353,10 @@ export async function getTasksByColumnId(columnId: string): Promise<Task[]> {
     .from('myboard_tasks')
     .select('*')
     .eq('column_id', columnId)
+    .order('position', { ascending: true, nullsFirst: true })
     .order('created_at', { ascending: true });
   if (error || !data) return [];
-  return data.map((t: any) => ({
+  const mapped: Task[] = data.map((t: any) => ({
     id: t.id,
     title: t.title,
     description: t.description || undefined,
@@ -275,12 +365,44 @@ export async function getTasksByColumnId(columnId: string): Promise<Task[]> {
     importanceColor: t.importance_color || undefined,
     columnId: t.column_id,
     boardId: t.board_id,
+    position: t.position ?? undefined,
     completed: !!t.completed,
     completedAt: t.completed_at || undefined,
     completedBy: t.completed_by || undefined,
     createdAt: t.created_at,
     createdBy: t.created_by,
+    allowed_weekdays: t.allowed_weekdays || undefined,
   }));
+  const hasPositions = mapped.some(t => typeof t.position === 'number');
+  if (hasPositions) {
+    return [...mapped].sort((a, b) => {
+      const ap = typeof a.position === 'number' ? a.position as number : Number.MAX_SAFE_INTEGER;
+      const bp = typeof b.position === 'number' ? b.position as number : Number.MAX_SAFE_INTEGER;
+      if (ap !== bp) return ap - bp;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+  }
+  // Legacy local order fallback
+  const key = `${TASK_ORDER_PREFIX}${columnId}`;
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    const orderIds = raw ? (JSON.parse(raw) as string[]) : undefined;
+    if (orderIds && orderIds.length > 0) {
+      const idToTask: Record<string, Task> = {};
+      for (const t of mapped) idToTask[t.id] = t;
+      const ordered: Task[] = [];
+      const seen = new Set<string>();
+      for (const id of orderIds) {
+        if (idToTask[id]) {
+          ordered.push(idToTask[id]);
+          seen.add(id);
+        }
+      }
+      for (const t of mapped) if (!seen.has(t.id)) ordered.push(t);
+      return ordered;
+    }
+  } catch {}
+  return mapped.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 export async function createTask(params: {
@@ -292,7 +414,21 @@ export async function createTask(params: {
   dueTime?: string;
   importanceColor?: string;
   createdBy: string;
+  allowed_weekdays?: number[];
 }): Promise<Task> {
+  // Determine next position for the column
+  let nextPosition = 0;
+  try {
+    const { data: last } = await supabase
+      .from('myboard_tasks')
+      .select('position')
+      .eq('column_id', params.columnId)
+      .order('position', { ascending: false, nullsFirst: false })
+      .limit(1);
+    if (last && last[0] && typeof last[0].position === 'number') {
+      nextPosition = (last[0].position as number) + 1;
+    }
+  } catch {}
   const { data, error } = await supabase
     .from('myboard_tasks')
     .insert([
@@ -305,6 +441,8 @@ export async function createTask(params: {
         column_id: params.columnId,
         board_id: params.boardId,
         created_by: params.createdBy,
+        allowed_weekdays: params.allowed_weekdays || null,
+        position: nextPosition,
       }
     ])
     .select()
@@ -316,12 +454,39 @@ export async function createTask(params: {
     description: data.description || undefined,
     dueDate: data.due_date || undefined,
     dueTime: data.due_time || undefined,
+    importanceColor: data.importance_color || undefined,
     columnId: data.column_id,
     boardId: data.board_id,
+    position: data.position ?? undefined,
     completed: !!data.completed,
+    completedAt: data.completed_at || undefined,
+    completedBy: data.completed_by || undefined,
     createdAt: data.created_at,
     createdBy: data.created_by,
+    allowed_weekdays: data.allowed_weekdays || undefined,
   };
+}
+
+export async function copyTaskToBoard(sourceTaskId: string, targetBoardId: string, targetColumnId: string, createdByUserId: string): Promise<Task> {
+  const task = await getTaskById(sourceTaskId);
+  if (!task) throw new Error('Task not found');
+  // Sanity: ensure target column belongs to target board
+  const cols = await getColumnsByBoardId(targetBoardId);
+  if (!cols.find(c => c.id === targetColumnId)) {
+    throw new Error('Target column does not belong to selected board');
+  }
+  // Create with similar fields but not completed, and with next position in target column
+  return await createTask({
+    boardId: targetBoardId,
+    columnId: targetColumnId,
+    title: task.title,
+    description: task.description,
+    dueDate: task.dueDate,
+    dueTime: task.dueTime,
+    importanceColor: task.importanceColor,
+    createdBy: createdByUserId,
+    allowed_weekdays: task.allowed_weekdays,
+  });
 }
 
 export async function updateTask(taskId: string, updates: Partial<Omit<Task, 'id'>>): Promise<void> {
@@ -333,11 +498,13 @@ export async function updateTask(taskId: string, updates: Partial<Omit<Task, 'id
   if ((updates as any).importanceColor !== undefined) payload.importance_color = (updates as any).importanceColor;
   if (updates.columnId !== undefined) payload.column_id = updates.columnId;
   if (updates.boardId !== undefined) payload.board_id = updates.boardId;
+  if (updates.position !== undefined) payload.position = updates.position;
   if (updates.completed !== undefined) payload.completed = updates.completed;
   if (updates.completedBy !== undefined) payload.completed_by = updates.completedBy || null;
   if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt || null;
   if (updates.createdAt !== undefined) payload.created_at = updates.createdAt;
   if (updates.createdBy !== undefined) payload.created_by = updates.createdBy;
+  if (updates.allowed_weekdays !== undefined) payload.allowed_weekdays = updates.allowed_weekdays;
   const { error } = await supabase
     .from('myboard_tasks')
     .update(payload)
@@ -346,9 +513,30 @@ export async function updateTask(taskId: string, updates: Partial<Omit<Task, 'id
 }
 
 export async function moveTask(taskId: string, toColumnId: string): Promise<void> {
+  // Read current task to know its previous column
+  const { data: cur, error: curErr } = await supabase
+    .from('myboard_tasks')
+    .select('id,column_id')
+    .eq('id', taskId)
+    .maybeSingle();
+  if (curErr) throw curErr;
+  const fromColumnId = cur?.column_id as string | undefined;
+
+  // Compute append position in target column
+  let appendPos = 0;
+  try {
+    const { data: last } = await supabase
+      .from('myboard_tasks')
+      .select('position')
+      .eq('column_id', toColumnId)
+      .order('position', { ascending: false, nullsFirst: false })
+      .limit(1);
+    if (last && last[0] && typeof last[0].position === 'number') appendPos = (last[0].position as number) + 1;
+  } catch {}
+
   const { error } = await supabase
     .from('myboard_tasks')
-    .update({ column_id: toColumnId })
+    .update({ column_id: toColumnId, position: appendPos })
     .eq('id', taskId);
   if (error) throw error;
 }
@@ -374,6 +562,10 @@ export async function deleteTask(taskId: string): Promise<void> {
     .delete()
     .eq('id', taskId);
   if (error) throw error;
+  // Remove from any local order cache
+  try {
+    // We do not know the column; attempt across known keys is expensive. Skip.
+  } catch {}
 }
 
 export async function resetColumnTasks(columnId: string): Promise<void> {
@@ -466,6 +658,7 @@ export async function getSnapshotTasks(snapshotId: string): Promise<TaskSnapshot
     .from('myboard_task_snapshots')
     .select('*')
     .eq('board_snapshot_id', snapshotId)
+    .order('position', { ascending: true, nullsFirst: true })
     .order('id', { ascending: true });
   if (error || !data) return [];
   return data.map((t: any) => ({
@@ -479,6 +672,7 @@ export async function getSnapshotTasks(snapshotId: string): Promise<TaskSnapshot
     completedAt: t.completed_at || undefined,
     completedBy: t.completed_by || undefined,
     importanceColor: t.importance_color || undefined,
+    position: t.position ?? undefined,
     originalColumnId: t.original_column_id,
     originalTaskId: t.original_task_id,
   }));
@@ -542,7 +736,19 @@ export async function snapshotBoardAndReset(boardId: string, finishedOn?: string
 
   // Insert task snapshots
   if (tasks.length > 0) {
-    const taskRows = tasks.map(t => ({
+    // Ensure we snapshot in current board order by column/position
+    const byColumn: Record<string, Task[]> = {};
+    for (const t of tasks) (byColumn[t.columnId] = byColumn[t.columnId] || []).push(t);
+    for (const list of Object.values(byColumn)) {
+      list.sort((a, b) => {
+        const ap = typeof (a as any).position === 'number' ? (a as any).position as number : Number.MAX_SAFE_INTEGER;
+        const bp = typeof (b as any).position === 'number' ? (b as any).position as number : Number.MAX_SAFE_INTEGER;
+        if (ap !== bp) return ap - bp;
+        return a.createdAt.localeCompare(b.createdAt);
+      });
+    }
+    const orderedTasks = Object.values(byColumn).flat();
+    const taskRows = orderedTasks.map(t => ({
       board_snapshot_id: snapshotId,
       title: t.title,
       description: t.description || null,
@@ -552,6 +758,7 @@ export async function snapshotBoardAndReset(boardId: string, finishedOn?: string
       completed_at: t.completedAt || null,
       completed_by: t.completedBy || null,
       importance_color: t.importanceColor || null,
+      position: (t as any).position ?? null,
       original_column_id: t.columnId,
       original_task_id: t.id,
     }));
@@ -639,7 +846,13 @@ export async function snapshotColumnAndReset(boardId: string, columnId: string, 
 
   const columnTasks = tasks.filter(t => t.columnId === columnId);
   if (columnTasks.length > 0) {
-    const taskRows = columnTasks.map(t => ({
+    const ordered = [...columnTasks].sort((a, b) => {
+      const ap = typeof (a as any).position === 'number' ? (a as any).position as number : Number.MAX_SAFE_INTEGER;
+      const bp = typeof (b as any).position === 'number' ? (b as any).position as number : Number.MAX_SAFE_INTEGER;
+      if (ap !== bp) return ap - bp;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+    const taskRows = ordered.map(t => ({
       board_snapshot_id: snapshotId,
       title: t.title,
       description: t.description || null,
@@ -649,6 +862,7 @@ export async function snapshotColumnAndReset(boardId: string, columnId: string, 
       completed_at: t.completedAt || null,
       completed_by: t.completedBy || null,
       importance_color: t.importanceColor || null,
+      position: (t as any).position ?? null,
       original_column_id: t.columnId,
       original_task_id: t.id,
     }));
@@ -669,4 +883,26 @@ export async function snapshotColumnAndReset(boardId: string, columnId: string, 
   return snapshotId;
 }
 
+
+// Reorder a task within its column using a local order list. This impacts client-side ordering only.
+export async function reorderTaskInColumn(columnId: string, taskId: string, direction: 'up' | 'down'): Promise<void> {
+  // Load current tasks with positions
+  const tasks = await getTasksByColumnId(columnId);
+  if (tasks.length === 0) return;
+  // Normalize positions if missing
+  const normalized = tasks.map((t, idx) => ({ ...t, position: typeof t.position === 'number' ? t.position : idx }));
+  normalized.sort((a, b) => (a.position as number) - (b.position as number));
+  const ids = normalized.map(t => t.id);
+  const index = ids.indexOf(taskId);
+  if (index === -1) return;
+  const swapWith = direction === 'up' ? index - 1 : index + 1;
+  if (swapWith < 0 || swapWith >= ids.length) return;
+  const a = normalized[index];
+  const b = normalized[swapWith];
+  const aPos = a.position as number;
+  const bPos = b.position as number;
+  // Swap positions server-side (two updates)
+  await updateTask(a.id, { position: bPos });
+  await updateTask(b.id, { position: aPos });
+}
 

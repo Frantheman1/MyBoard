@@ -41,11 +41,13 @@ export interface Task {
   importanceColor?: string;
   columnId: string;
   boardId: string;
+  position?: number;
   completed: boolean;
   completedAt?: string;
   createdAt: string;
   createdBy: string;
   completedBy?: string;
+  allowed_weekdays?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
 }
 
 // Snapshots
@@ -79,6 +81,7 @@ export interface TaskSnapshot {
   completedAt?: string;
   completedBy?: string;
   importanceColor?: string;
+  position?: number;
   originalColumnId: string;
   originalTaskId: string;
 }

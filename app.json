@@ -2,7 +2,7 @@
   "expo": {
     "name": "MyBoard",
     "slug": "MyBoard",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.myboardapp.myboard",
-      "buildNumber": "1.0.7",
+      "buildNumber": "1.0.8",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "We use your photo to set your profile picture.",
         "NSCameraUsageDescription": "Allow camera to take a profile photo.",
