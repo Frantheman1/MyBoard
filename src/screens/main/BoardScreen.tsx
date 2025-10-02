@@ -333,7 +333,8 @@ export default function BoardScreen() {
         dueTime: taskDueTime || undefined,
         // send empty string to clear color (storage maps '' -> null)
         importanceColor: taskImportanceColor,
-        ...(taskAllowedWeekdays.length > 0 ? { allowed_weekdays: taskAllowedWeekdays } : { allowed_weekdays: undefined }),
+        // If no weekdays selected, set null to mean available all days
+        allowed_weekdays: taskAllowedWeekdays.length > 0 ? taskAllowedWeekdays : (null as any),
       });
       setEditingTaskId(null);
       setTaskModalColumnId(null);
@@ -533,7 +534,7 @@ export default function BoardScreen() {
                         <Text style={[styles.taskDesc, { color: task.completed ? '#065f46' : secondaryOnBg }]}>{task.description}</Text>
                       ) : null}
                       {!allowed && onlyLabel ? (
-                        <Text style={{ color: theme.colors.secondaryText, fontSize: 12, marginTop: 2 }}>{onlyLabel}</Text>
+                        <Text style={{ color: secondaryOnBg, fontSize: 12, marginTop: 2 }}>{onlyLabel}</Text>
                       ) : null}
                     </View>
                     <View style={styles.taskMeta}>
@@ -548,22 +549,6 @@ export default function BoardScreen() {
                     </View>
                   </View>
                   <View style={styles.taskActionsRow}>
-                    {isAdmin && (
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
-                        <TouchableOpacity
-                          onPress={async () => { await reorderTaskInColumn(col.id, task.id, 'up'); await load(); }}
-                          style={[styles.actionBtn, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb' }]}
-                        >
-                          <Text style={[styles.actionBtnText, { color: theme.colors.secondaryText }]}>▲</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={async () => { await reorderTaskInColumn(col.id, task.id, 'down'); await load(); }}
-                          style={[styles.actionBtn, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb' }]}
-                        >
-                          <Text style={[styles.actionBtnText, { color: theme.colors.secondaryText }]}>▼</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
                     <TouchableOpacity
                       onPress={() => allowed && handleToggleDone(task.id, !task.completed)}
                       style={[
@@ -585,6 +570,24 @@ export default function BoardScreen() {
                       ])} style={[styles.actionBtn, styles.actionDanger]}>
                         <Text style={[styles.actionBtnText, styles.actionDangerText]}>{t.common.delete}</Text>
                       </TouchableOpacity>
+                    )}
+                  </View>
+                  <View style={styles.taskActionsRow}>
+                  {isAdmin && (
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          onPress={async () => { await reorderTaskInColumn(col.id, task.id, 'up'); await load(); }}
+                          style={[styles.actionBtn, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb' }]}
+                        >
+                          <Text style={[styles.actionBtnText, { color: theme.colors.secondaryText }]}>▲</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={async () => { await reorderTaskInColumn(col.id, task.id, 'down'); await load(); }}
+                          style={[styles.actionBtn, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb' }]}
+                        >
+                          <Text style={[styles.actionBtnText, { color: theme.colors.secondaryText }]}>▼</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
                   {task.completed && task.completedBy ? (
@@ -677,7 +680,7 @@ export default function BoardScreen() {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingTaskId ? t.board.modalEditTask : t.board.modalNewTask}</Text>
-              <View style={{ gap: 10 }}>
+              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 10, paddingBottom: 16 }}>
                 <View>
                   <Text style={[styles.modalLabel, { color: theme.colors.secondaryText }]}>{t.board.labelTitle}</Text>
                   <TextInput
@@ -822,8 +825,8 @@ export default function BoardScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
-              ) : null}
+                  </View>
+                ) : null}
                 {editingTaskId && isAdmin && ( // Only show move option if editing an existing task and user is admin
                   <View style={styles.moveRow}>
                     {columns
@@ -835,7 +838,7 @@ export default function BoardScreen() {
                       ))}
                   </View>
                 )}
-              </View>
+              </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity onPress={closeTaskModal} style={styles.modalCancel}>
                   <Text style={{ color: theme.colors.secondaryText, fontWeight: '600' }}>{t.common.cancel}</Text>
@@ -1073,7 +1076,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  modalCard: { width: '100%', borderRadius: 12, padding: 16, borderWidth: 1 },
+  modalCard: { width: '100%', borderRadius: 12, padding: 16, borderWidth: 1, marginTop: 60, marginBottom: 30 },
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
   modalLabel: { fontSize: 12, marginBottom: 6 },
   modalInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
