@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getOrganizationById } from '../../utils/storage';
+import { getOrganizationById, getOrganizationSettings, updateOrganizationSettings } from '../../utils/storage';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import AnimatedTitle from '../../../components/AnimatedTitle';
@@ -24,6 +24,8 @@ export default function ProfileScreen() {
   const [members, setMembers] = useState<Array<{ id: string; name: string; email: string; is_admin: boolean; avatar_url?: string }>>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const [resetOnSubmit, setResetOnSubmit] = useState(true);
+  const [autoSendEOD, setAutoSendEOD] = useState(false);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
@@ -32,6 +34,13 @@ export default function ProfileScreen() {
       if (!user) return;
       const org = await getOrganizationById(user.organizationId);
       if (!active) return; setInviteCode(org?.inviteCode || '');
+      // org settings
+      try {
+        const settings = await getOrganizationSettings(user.organizationId);
+        if (!active) return;
+        setResetOnSubmit(!!settings.resetOnSubmit);
+        setAutoSendEOD(!!settings.autoSendEndOfDay);
+      } catch {}
   
       // avatar/me
       const { data: me } = await supabase.from('profiles').select('avatar_url').eq('id', user.id).single();
@@ -187,7 +196,7 @@ export default function ProfileScreen() {
         </Card>
 
         {/* Settings */}
-        <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View style={[styles.settingsSection, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
           <TouchableOpacity style={styles.settingItem} onPress={toggleLanguage}>
             <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.settings.language}</Text>
             <Text style={[styles.settingValue, { color: theme.colors.primary }]}>
@@ -203,12 +212,34 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           {user.role === 'admin' && (
-            <View style={styles.settingItem}>
-              <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.profile.inviteCode}</Text>
-              <TouchableOpacity onPress={() => { if (inviteCode) { Alert.alert(t.profile.inviteCode, inviteCode); } }}>
-                <Text style={[styles.settingValue, { textDecorationLine: 'underline', color: theme.colors.primary }]}>{inviteCode || '-'}</Text>
-              </TouchableOpacity>
-            </View>
+            <>
+              <View style={styles.settingItem}>
+                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.profile.inviteCode}</Text>
+                <TouchableOpacity onPress={() => { if (inviteCode) { Alert.alert(t.profile.inviteCode, inviteCode); } }}>
+                  <Text style={[styles.settingValue, { textDecorationLine: 'underline', color: theme.colors.primary }]}>{inviteCode || '-'}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.settingItem}>
+                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.admin.resetOnSubmit}</Text>
+                <TouchableOpacity onPress={async () => {
+                  const next = !resetOnSubmit;
+                  setResetOnSubmit(next);
+                  await updateOrganizationSettings(user.organizationId, { resetOnSubmit: next });
+                }}>
+                  <Text style={[styles.settingValue, { color: theme.colors.primary }]}>{resetOnSubmit ? t.common.on : t.common.off}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.settingItem}>
+                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>{t.admin.autoSendEOD}</Text>
+                <TouchableOpacity onPress={async () => {
+                  const next = !autoSendEOD;
+                  setAutoSendEOD(next);
+                  await updateOrganizationSettings(user.organizationId, { autoSendEndOfDay: next });
+                }}>
+                  <Text style={[styles.settingValue, { color: theme.colors.primary }]}>{autoSendEOD ? t.common.on : t.common.off}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
 
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

@@ -23,6 +23,7 @@ export default function SnapshotScreen() {
   const [columns, setColumns] = useState<ColumnSnapshot[]>([]);
   const [tasks, setTasks] = useState<TaskSnapshot[]>([]);
   const [userProfiles, setUserProfiles] = useState<Record<string, { name: string; email: string; avatar_url?: string }>>({});
+  const [allowedWeekdaysByTaskId, setAllowedWeekdaysByTaskId] = useState<Record<string, number[] | undefined>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -58,6 +59,28 @@ export default function SnapshotScreen() {
       }
     };
     loadProfiles();
+  }, [tasks]);
+
+  // Load allowed_weekdays for original tasks to determine whether each task is active on the snapshot date
+  useEffect(() => {
+    const loadAllowed = async () => {
+      const ids = Array.from(new Set((tasks || []).map(t => t.originalTaskId).filter(Boolean) as string[]));
+      if (ids.length === 0) { setAllowedWeekdaysByTaskId({}); return; }
+      const { data, error } = await supabase
+        .from('myboard_tasks')
+        .select('id, allowed_weekdays')
+        .in('id', ids);
+      if (!error && data) {
+        const map: Record<string, number[] | undefined> = {};
+        for (const row of data as any[]) {
+          map[row.id as string] = (row.allowed_weekdays as number[] | null) || undefined;
+        }
+        setAllowedWeekdaysByTaskId(map);
+      } else {
+        setAllowedWeekdaysByTaskId({});
+      }
+    };
+    loadAllowed();
   }, [tasks]);
 
   const formatDueTime = (time?: string): string => {
@@ -149,10 +172,22 @@ export default function SnapshotScreen() {
                 const secondaryOnBg = isColored ? (textOnBg === '#FFFFFF' ? 'rgba(255,255,255,0.9)' : '#374151') : theme.colors.secondaryText;
                 const chipBg = isColored ? (textOnBg === '#FFFFFF' ? 'rgba(255,255,255,0.25)' : 'rgba(17,24,39,0.08)') : (isDark ? '#1f2937' : '#f3f4f6');
                 const chipText = isColored ? (textOnBg === '#FFFFFF' ? '#FFFFFF' : '#374151') : theme.colors.secondaryText;
+                // Weekday restriction logic for snapshot date
+                const snapshotDay = (() => {
+                  try { return new Date(finishedOn).getDay(); } catch { return new Date().getDay(); }
+                })();
+                const allowedWeekdays = allowedWeekdaysByTaskId[task.originalTaskId];
+                const allowed = !allowedWeekdays || allowedWeekdays.length === 0 || allowedWeekdays.includes(snapshotDay);
+                const onlyLabel = allowedWeekdays && allowedWeekdays.length > 0
+                  ? t.board.onlyOn + allowedWeekdays.map((d: number) => t.board.days[['sun','mon','tue','wed','thu','fri','sat'][d]]).join(', ')
+                  : undefined;
                 return (
-                <View key={task.id} style={[styles.taskCard, { backgroundColor: cardBg }]}>
+                <View key={task.id} style={[styles.taskCard, { backgroundColor: cardBg, opacity: allowed ? 1 : 0.5 }]}>
                   <Text style={[styles.taskTitle, { color: task.completed ? '#065f46' : textOnBg }, task.completed && styles.taskTitleDone]}>{task.title}</Text>
                   {task.description ? <Text style={[styles.taskDesc, { color: task.completed ? '#065f46' : secondaryOnBg }]}>{task.description}</Text> : null}
+                  {!allowed && onlyLabel ? (
+                    <Text style={{ color: secondaryOnBg, fontSize: 12, marginTop: 2 }}>{onlyLabel}</Text>
+                  ) : null}
                   <View style={styles.taskMetaRow}>
                     {(task.dueDate || task.dueTime) ? (
                       <Text style={[styles.dueDateText, { backgroundColor: chipBg, color: chipText }]}>

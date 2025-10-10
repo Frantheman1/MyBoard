@@ -64,6 +64,9 @@ const translations = {
       actions: 'Actions',
       someone: 'Someone',
       success: 'Success',
+      loading: 'Loading…',
+      on: 'On',
+      off: 'Off',
     },
     notifications: {
       title: 'Notifications',
@@ -93,12 +96,15 @@ const translations = {
       by: 'By',
       confirmFinishTitle: 'Mark board finished?',
       confirmFinishMessage: 'This will archive',
+      settings: 'Settings',
+      resetOnSubmit: 'Reset tasks when submitted',
+      autoSendEOD: 'Automatic send at end of day',
 
     },
     board: {
       newColumn: 'New Column',
       columnNamePlaceholder: 'Column name',
-      finishAndReset: 'Finish & Reset',
+      finishBoard: 'Finish Board',
       addTask: 'Add Task',
       sendColumn: 'Send Column to the Admin',
       noTasks: 'No tasks',
@@ -241,11 +247,14 @@ const translations = {
       by: 'Av',
       confirmFinishTitle: 'Marker tavle som fullført?',
       confirmFinishMessage: 'Dette vil arkivere',
+      settings: 'Innstillinger',
+      resetOnSubmit: 'Nullstill oppgaver ved sending',
+      autoSendEOD: 'Automatisk sending ved midnatt',
     },
     board: {
       newColumn: 'Ny kolonne',
       columnNamePlaceholder: 'Kolonnenavn',
-      finishAndReset: 'Fullfør og nullstill',
+      finishBoard: 'Fullfør tavle',
       addTask: 'Legg til oppgave',
       sendColumn: 'Send kolonne til administrator',
       noTasks: 'Ingen oppgaver',
@@ -351,6 +360,9 @@ const translations = {
       actions: 'Handlinger',
       someone: 'Noen',
       success: 'Vellykket',
+      loading: 'Laster…',
+      on: 'På',
+      off: 'Av',
     },
     help: {
       common: {

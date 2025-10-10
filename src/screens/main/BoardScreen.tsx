@@ -29,6 +29,9 @@ import {
   resetColumnTasks,
   snapshotBoardAndReset,
   snapshotColumnAndReset,
+  getOrganizationSettings,
+  getLastBoardDeliveredAt,
+  getLastColumnsDeliveredAtMap,
 } from '../../utils/storage';
 
 type BoardRouteProp = RouteProp<{ Board: { boardId: string } }, 'Board'>;
@@ -61,6 +64,7 @@ export default function BoardScreen() {
   const [copyColumns, setCopyColumns] = useState<Record<string, { id: string; title: string }[]>>({});
   const [copyTargetBoardId, setCopyTargetBoardId] = useState<string>('');
   const [copyTargetColumnId, setCopyTargetColumnId] = useState<string>('');
+  const [lastColumnDeliveredMap, setLastColumnDeliveredMap] = useState<Record<string, string | undefined>>({});
 
   // Helpers for date parsing/formatting
   const parseDateInputToISO = (input: string): string | undefined => {
@@ -133,6 +137,10 @@ export default function BoardScreen() {
     const tks = await getTasksByBoardId(boardId);
     setColumns(cols);
     setTasks(tks);
+    try {
+      const map = await getLastColumnsDeliveredAtMap(cols.map(c => c.id));
+      setLastColumnDeliveredMap(map);
+    } catch {}
   };
 
   useEffect(() => {
@@ -612,7 +620,11 @@ export default function BoardScreen() {
               )}
               <TouchableOpacity style={[styles.addTaskButton, { marginTop: 6 }]} onPress={async () => {
                 try {
-                  await snapshotColumnAndReset(boardId, col.id, { submittedBy: user?.id, submissionType: 'user' });
+                  let reset = true;
+                  if (user?.organizationId) {
+                    try { const s = await getOrganizationSettings(user.organizationId); reset = !!s.resetOnSubmit; } catch {}
+                  }
+                  await snapshotColumnAndReset(boardId, col.id, { submittedBy: user?.id, submissionType: 'user' }, reset);
                   Alert.alert(t.common.sent, t.board.columnSent);
                   await load();
                 } catch (e: any) {
@@ -621,6 +633,11 @@ export default function BoardScreen() {
               }}>
                 <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>{t.board.sendColumn}</Text>
               </TouchableOpacity>
+              {lastColumnDeliveredMap[col.id] ? (
+                <Text style={{ textAlign: 'center', marginTop: 4, color: theme.colors.secondaryText, fontSize: 12 }}>
+                  {t.admin.finishedOn}: {formatISOForDisplayNO(lastColumnDeliveredMap[col.id] as string)}
+                </Text>
+              ) : null}
             </View>
           </View>
           </ScrollView>
@@ -643,14 +660,18 @@ export default function BoardScreen() {
             </View>
             <TouchableOpacity style={[styles.addTaskButton, { marginTop: 8 }]} onPress={async () => {
               try {
-                await snapshotBoardAndReset(boardId, undefined, false, { submittedBy: user?.id, submissionType: 'admin_finish' });
+                let reset = true;
+                if (user?.organizationId) {
+                  try { const s = await getOrganizationSettings(user.organizationId); reset = !!s.resetOnSubmit; } catch {}
+                }
+                await snapshotBoardAndReset(boardId, undefined, false, { submittedBy: user?.id, submissionType: 'admin_finish' }, reset);
                 Alert.alert(t.common.finished, t.board.boardFinished);
                 await load();
               } catch (e: any) {
                 Alert.alert(t.common.error, e?.message || t.board.unableFinishReset);
               }
             }}>
-              <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>{t.board.finishAndReset}</Text>
+              <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>{t.board.finishBoard}</Text>
             </TouchableOpacity>
           </View>
         )}

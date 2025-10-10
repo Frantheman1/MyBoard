@@ -15,6 +15,12 @@ export interface Organization {
   createdAt: string;
 }
 
+export interface OrganizationSettings {
+  organizationId: string;
+  resetOnSubmit: boolean;
+  autoSendEndOfDay: boolean;
+}
+
 export interface Board {
   id: string;
   title: string;

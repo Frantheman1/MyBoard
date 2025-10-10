@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
-import { Board, Column, Task, Organization, BoardSnapshot, ColumnSnapshot, TaskSnapshot } from '../types';
+import { Board, Column, Task, Organization, BoardSnapshot, ColumnSnapshot, TaskSnapshot, OrganizationSettings } from '../types';
 
 const STORAGE_KEYS = {
   BOARDS: 'myboard_boards',
   COLUMNS: 'myboard_columns',
   TASKS: 'myboard_tasks',
   ORGS: 'myboard_organizations',
+  ORG_SETTINGS_PREFIX: 'myboard_org_settings__',
 } as const;
 
 const TASK_ORDER_PREFIX = 'myboard_task_order__'; // legacy local ordering (kept as fallback)
@@ -62,6 +63,110 @@ export async function getOrganizationByInviteCode(inviteCode: string): Promise<O
     return mapped;
   } catch {
     return undefined;
+  }
+}
+
+// Organization Settings (per-organization)
+export async function getOrganizationSettings(organizationId: string): Promise<OrganizationSettings> {
+  const defaults: OrganizationSettings = {
+    organizationId,
+    resetOnSubmit: true,
+    autoSendEndOfDay: false,
+  };
+  // Try server first
+  try {
+    const { data, error } = await supabase
+      .from('myboard_org_settings')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      return defaults;
+    }
+    return {
+      organizationId,
+      resetOnSubmit: !!data.reset_on_submit,
+      autoSendEndOfDay: !!data.auto_send_eod,
+    };
+  } catch {
+    // Fallback to local storage per org
+    const key = `${STORAGE_KEYS.ORG_SETTINGS_PREFIX}${organizationId}`;
+    return await readJson<OrganizationSettings>(key, defaults);
+  }
+}
+
+export async function updateOrganizationSettings(organizationId: string, updates: Partial<Omit<OrganizationSettings, 'organizationId'>>): Promise<OrganizationSettings> {
+  const current = await getOrganizationSettings(organizationId);
+  const next: OrganizationSettings = { ...current, ...updates };
+  // Try server first
+  try {
+    const payload = {
+      organization_id: organizationId,
+      reset_on_submit: next.resetOnSubmit,
+      auto_send_eod: next.autoSendEndOfDay,
+      updated_at: new Date().toISOString(),
+    } as const;
+    const { error } = await supabase
+      .from('myboard_org_settings')
+      .upsert([payload], { onConflict: 'organization_id' } as any);
+    if (error) throw error;
+  } catch {
+    // Fallback to local storage per org
+    const key = `${STORAGE_KEYS.ORG_SETTINGS_PREFIX}${organizationId}`;
+    await writeJson(key, next);
+  }
+  return next;
+}
+
+// Last delivered helpers
+export async function getLastBoardDeliveredAt(boardId: string): Promise<string | undefined> {
+  try {
+    const { data, error } = await supabase
+      .from('myboard_board_snapshots')
+      .select('finished_on')
+      .eq('board_id', boardId)
+      .order('finished_on', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return undefined;
+    return data.finished_on as string | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getLastColumnsDeliveredAtMap(columnIds: string[]): Promise<Record<string, string | undefined>> {
+  if (!columnIds || columnIds.length === 0) return {};
+  try {
+    const { data: colSnaps, error } = await supabase
+      .from('myboard_column_snapshots')
+      .select('original_column_id, board_snapshot_id')
+      .in('original_column_id', columnIds)
+      .order('id', { ascending: false });
+    if (error || !colSnaps) return {};
+    const latestByColumn: Record<string, string> = {};
+    for (const row of colSnaps as any[]) {
+      const colId = row.original_column_id as string;
+      if (!latestByColumn[colId]) {
+        latestByColumn[colId] = row.board_snapshot_id as string;
+      }
+    }
+    const snapshotIds = Array.from(new Set(Object.values(latestByColumn)));
+    if (snapshotIds.length === 0) return {};
+    const { data: snaps } = await supabase
+      .from('myboard_board_snapshots')
+      .select('id, finished_on')
+      .in('id', snapshotIds);
+    const idToDate: Record<string, string> = {};
+    for (const s of (snaps || []) as any[]) idToDate[s.id] = s.finished_on as string;
+    const result: Record<string, string | undefined> = {};
+    for (const [colId, snapId] of Object.entries(latestByColumn)) {
+      result[colId] = idToDate[snapId];
+    }
+    return result;
+  } catch {
+    return {};
   }
 }
 
@@ -679,7 +784,13 @@ export async function getSnapshotTasks(snapshotId: string): Promise<TaskSnapshot
 }
 
 // Create snapshot for a board and reset its tasks
-export async function snapshotBoardAndReset(boardId: string, finishedOn?: string, dedupe: boolean = false, opts?: { submittedBy?: string; submissionType?: 'user' | 'admin_finish' }): Promise<string | undefined> {
+export async function snapshotBoardAndReset(
+  boardId: string,
+  finishedOn?: string,
+  dedupe: boolean = false,
+  opts?: { submittedBy?: string; submissionType?: 'user' | 'admin_finish' },
+  reset: boolean = true,
+): Promise<string | undefined> {
   // Load board, columns, tasks
   const board = await getBoardById(boardId);
   if (!board) return undefined;
@@ -768,12 +879,14 @@ export async function snapshotBoardAndReset(boardId: string, finishedOn?: string
     if (taskErr) throw taskErr;
   }
 
-  // Reset tasks for next day
-  const { error: resetErr } = await supabase
-    .from('myboard_tasks')
-    .update({ completed: false, completed_at: null, completed_by: null })
-    .eq('board_id', boardId);
-  if (resetErr) throw resetErr;
+  // Reset tasks for next day (optional)
+  if (reset) {
+    const { error: resetErr } = await supabase
+      .from('myboard_tasks')
+      .update({ completed: false, completed_at: null, completed_by: null })
+      .eq('board_id', boardId);
+    if (resetErr) throw resetErr;
+  }
 
   // Mark board finished_at (archive list can rely on this or snapshots list)
   try {
@@ -785,7 +898,7 @@ export async function snapshotBoardAndReset(boardId: string, finishedOn?: string
 
 // Ensure a board has a snapshot for a given UTC day, otherwise create it
 export async function ensureDailySnapshotForBoard(boardId: string, utcDate: string): Promise<void> {
-  await snapshotBoardAndReset(boardId, utcDate);
+  await snapshotBoardAndReset(boardId, utcDate, true);
 }
 
 // Ensure all active boards in an organization have a snapshot for a given UTC day
@@ -805,7 +918,12 @@ export async function deleteSnapshot(snapshotId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function snapshotColumnAndReset(boardId: string, columnId: string, opts?: { submittedBy?: string; submissionType?: 'user' | 'admin_finish' }): Promise<string | undefined> {
+export async function snapshotColumnAndReset(
+  boardId: string,
+  columnId: string,
+  opts?: { submittedBy?: string; submissionType?: 'user' | 'admin_finish' },
+  reset: boolean = true,
+): Promise<string | undefined> {
   const board = await getBoardById(boardId);
   if (!board) return undefined;
   const [columns, tasks] = await Promise.all([
@@ -872,13 +990,15 @@ export async function snapshotColumnAndReset(boardId: string, columnId: string, 
     if (taskErr) throw taskErr;
   }
 
-  // Reset only tasks from this column
-  const { error: resetErr } = await supabase
-    .from('myboard_tasks')
-    .update({ completed: false, completed_at: null, completed_by: null })
-    .eq('board_id', boardId)
-    .eq('column_id', columnId);
-  if (resetErr) throw resetErr;
+  // Reset only tasks from this column (optional)
+  if (reset) {
+    const { error: resetErr } = await supabase
+      .from('myboard_tasks')
+      .update({ completed: false, completed_at: null, completed_by: null })
+      .eq('board_id', boardId)
+      .eq('column_id', columnId);
+    if (resetErr) throw resetErr;
+  }
 
   return snapshotId;
 }

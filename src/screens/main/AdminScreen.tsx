@@ -7,7 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../../lib/supabase';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Board, BoardSnapshot } from '../../types';
-import { getBoardsByOrganizationId, listSnapshotsByOrganization, snapshotBoardAndReset, deleteSnapshot } from '../../utils/storage';
+import { getBoardsByOrganizationId, listSnapshotsByOrganization, snapshotBoardAndReset, deleteSnapshot, getOrganizationSettings } from '../../utils/storage';
 import AnimatedTitle from '../../../components/AnimatedTitle';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,17 +24,23 @@ export default function AdminScreen() {
   const [isBoardsOpen, setIsBoardsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const { theme } = useTheme();
+  const [resetOnSubmit, setResetOnSubmit] = useState(true);
 
   const isAdmin = user?.role === 'admin';
 
   const load = async (activeRef?: { current: boolean }) => {
     if (!user?.organizationId) return;
     const all = await getBoardsByOrganizationId(user.organizationId);
-    if (activeRef?.current === false) return; 
+    if (activeRef && activeRef.current === false) return; 
     setActiveBoards(all);
      const snaps = await listSnapshotsByOrganization(user.organizationId);
-     if (activeRef?.current === false) return; 
+     if (activeRef && activeRef.current === false) return; 
      setSnapshots(snaps);
+    try {
+      const settings = await getOrganizationSettings(user.organizationId);
+      if (activeRef && activeRef.current === false) return;
+      setResetOnSubmit(!!settings.resetOnSubmit);
+    } catch {}
     const submitterIds = Array.from(new Set((snaps || []).map(s => s.submittedBy).filter(Boolean) as string[]));
     if (submitterIds.length > 0) {
       const { data } = await supabase
@@ -45,9 +51,9 @@ export default function AdminScreen() {
       for (const p of (data || []) as any[]) {
         map[p.id] = p.name || p.email;
       }
-      if (activeRef?.current === false) return; setProfileNames(map);
+      if (activeRef && activeRef.current === false) return; setProfileNames(map);
     } else {
-        if (activeRef?.current === false) return; setProfileNames({});
+        if (activeRef && activeRef.current === false) return; setProfileNames({});
     }
   };
 
@@ -87,7 +93,7 @@ export default function AdminScreen() {
     if (!isAdmin) return;
     Alert.alert(t.admin.confirmFinishTitle, `${t.admin.confirmFinishMessage} "${board.title}".`, [
       { text: t.common.cancel, style: 'cancel' },
-      { text: t.admin.finish, style: 'destructive', onPress: async () => { await snapshotBoardAndReset(board.id, undefined, false, { submittedBy: user?.id, submissionType: 'admin_finish' }); await load(); } }
+      { text: t.admin.finish, style: 'destructive', onPress: async () => { await snapshotBoardAndReset(board.id, undefined, false, { submittedBy: user?.id, submissionType: 'admin_finish' }, resetOnSubmit); await load(); } }
     ]);
   };
 
@@ -124,6 +130,7 @@ export default function AdminScreen() {
       <ScrollView contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       >
+        {/* Organization settings moved to Profile screen */}
         {renderSectionHeader(t.admin.boards, activeBoards.length, () => setIsBoardsOpen(prev => !prev), isBoardsOpen)}
         {isBoardsOpen && (activeBoards.length === 0 ? (
           <View style={styles.emptyState}><Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>{t.admin.noBoards}</Text></View>
@@ -186,6 +193,9 @@ const styles = StyleSheet.create({
   chevron: { fontSize: 18 },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   content: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 50, gap: 10 },
+  settingsCard: { borderRadius: 16, padding: 12, borderWidth: 1 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  toggleLabel: { fontSize: 14, fontWeight: '600' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 6 },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
   countPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
