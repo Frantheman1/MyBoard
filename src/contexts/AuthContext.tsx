@@ -96,8 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    // Passive logout: listener will flip user to null.
-    await supabase.auth.signOut();
+    // Explicitly clear local state/cache after signing out to avoid any race with the listener
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+      try { await AsyncStorage.removeItem('myboard_user'); } catch {}
+    }
   };
 
   return (

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -517,14 +518,29 @@ export default function BoardScreen() {
                 ? t.board.onlyOn + task.allowed_weekdays.map(d => t.board.days[['sun','mon','tue','wed','thu','fri','sat'][d]]).join(', ')
                 : undefined;
               return (
-                <TouchableOpacity
+                <Swipeable
                   key={task.id}
+                  renderRightActions={() => (
+                    isAdmin ? (
+                      <TouchableOpacity
+                        onPress={() => {
+                          Alert.alert(t.board.deleteTaskTitle, t.board.deleteTaskMessage, [
+                            { text: t.common.cancel, style: 'cancel' },
+                            { text: t.common.delete, style: 'destructive', onPress: async () => { await deleteTask(task.id); await load(); } }
+                          ]);
+                        }}
+                      >
+                        <View style={styles.taskDeleteButton}>
+                          <Text style={styles.taskDeleteButtonText}>{t.common.delete}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ) : <View />
+                  )}
+                >
+                <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => { if (isAdmin) openEditTask(task); }}  
-                  style={[
-                    styles.taskCard,
-                    { backgroundColor: cardBg, opacity: allowed ? 1 : 0.5 },
-                  ]}
+                  onPress={() => { if (isAdmin) openEditTask(task); }}
+                  style={[styles.taskCard, { backgroundColor: cardBg, opacity: allowed ? 1 : 0.5 }]}
                   disabled={!allowed && !isAdmin}
                 >
                   <View style={styles.taskContentRow}>
@@ -571,14 +587,6 @@ export default function BoardScreen() {
                         {task.completed ? t.board.done : t.board.markDone}
                       </Text>
                     </TouchableOpacity>
-                    {isAdmin && (
-                      <TouchableOpacity onPress={() => Alert.alert(t.board.deleteTaskTitle, t.board.deleteTaskMessage, [
-                        { text: t.common.cancel, style: 'cancel' },
-                        { text: t.common.delete, style: 'destructive', onPress: async () => { await deleteTask(task.id); await load(); } }
-                      ])} style={[styles.actionBtn, styles.actionDanger]}>
-                        <Text style={[styles.actionBtnText, styles.actionDangerText]}>{t.common.delete}</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
                   <View style={styles.taskActionsRow}>
                   {isAdmin && (
@@ -609,6 +617,7 @@ export default function BoardScreen() {
                     </View>
                   ) : null}
                 </TouchableOpacity>
+                </Swipeable>
               );
             })}
 
@@ -1004,6 +1013,20 @@ const styles = StyleSheet.create({
   },
   actionDangerText: {
     color: '#b91c1c',
+  },
+  taskDeleteButton: {
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 8,
+    marginBottom: 8,
+    marginRight: 0,
+  },
+  taskDeleteButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
   completedInfoRow: {
     flexDirection: 'row',
