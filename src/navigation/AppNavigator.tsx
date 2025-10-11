@@ -104,25 +104,25 @@ export default function AppNavigator() {
   const { theme, isDark } = useTheme();
   const lastRunDateRef = useRef<string | null>(null);
 
-  // Auto-send at end of day (00:00 UTC) – run once per UTC day when app becomes active
+  // Auto-send at end of day (local day) – run once per day when app becomes active
   useEffect(() => {
     if (!user || user.role !== 'admin' || !user.organizationId) return;
     const sub = AppState.addEventListener('change', async (state: AppStateStatus) => {
       if (state !== 'active') return;
       try {
         const now = new Date();
-        const y = now.getUTCFullYear();
-        const m = String(now.getUTCMonth() + 1).padStart(2, '0');
-        const d = String(now.getUTCDate()).padStart(2, '0');
-        const utcDate = `${y}-${m}-${d}`;
-        if (lastRunDateRef.current === utcDate) return;
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const localDate = `${y}-${m}-${d}`;
+        if (lastRunDateRef.current === localDate) return;
         // Check org settings to see if auto-send is enabled
         const { getOrganizationSettings } = await import('../utils/storage');
         const settings = await getOrganizationSettings(user.organizationId);
         if (settings.autoSendEndOfDay) {
-          await ensureDailySnapshotsForOrganization(user.organizationId, utcDate);
+          await ensureDailySnapshotsForOrganization(user.organizationId, localDate);
         }
-        lastRunDateRef.current = utcDate;
+        lastRunDateRef.current = localDate;
       } catch {}
     });
     return () => sub.remove();

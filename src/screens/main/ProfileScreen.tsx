@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getOrganizationById, getOrganizationSettings, updateOrganizationSettings } from '../../utils/storage';
+import { getOrganizationById, getOrganizationSettings, updateOrganizationSettings, ensureDailySnapshotsForOrganization } from '../../utils/storage';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import AnimatedTitle from '../../../components/AnimatedTitle';

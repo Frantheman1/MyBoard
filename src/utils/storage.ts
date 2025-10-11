@@ -790,6 +790,7 @@ export async function snapshotBoardAndReset(
   dedupe: boolean = false,
   opts?: { submittedBy?: string; submissionType?: 'user' | 'admin_finish' },
   reset: boolean = true,
+  markFinished: boolean = true,
 ): Promise<string | undefined> {
   // Load board, columns, tasks
   const board = await getBoardById(boardId);
@@ -888,24 +889,27 @@ export async function snapshotBoardAndReset(
     if (resetErr) throw resetErr;
   }
 
-  // Mark board finished_at (archive list can rely on this or snapshots list)
-  try {
-    await markBoardFinished(boardId);
-  } catch {}
+  // Mark board finished_at (optional)
+  if (markFinished) {
+    try {
+      await markBoardFinished(boardId);
+    } catch {}
+  }
 
   return snapshotId;
 }
 
 // Ensure a board has a snapshot for a given UTC day, otherwise create it
 export async function ensureDailySnapshotForBoard(boardId: string, utcDate: string): Promise<void> {
-  await snapshotBoardAndReset(boardId, utcDate, true);
+  // Daily auto-send should not archive the board; pass markFinished=false
+  await snapshotBoardAndReset(boardId, utcDate, true, undefined, true, false);
 }
 
 // Ensure all active boards in an organization have a snapshot for a given UTC day
 export async function ensureDailySnapshotsForOrganization(organizationId: string, utcDate: string): Promise<void> {
   const boards = await getBoardsByOrganizationId(organizationId);
-  const active = boards.filter(b => !b.finishedAt);
-  for (const b of active) {
+  // Process all boards, even if previously marked finished, so daily runs always apply
+  for (const b of boards) {
     await ensureDailySnapshotForBoard(b.id, utcDate);
   }
 }
