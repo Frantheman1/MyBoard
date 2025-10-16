@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ScrollView } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ export default function AdminScreen() {
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
   const [isBoardsOpen, setIsBoardsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [openDateFolders, setOpenDateFolders] = useState<Set<string>>(new Set());
   const { theme } = useTheme();
   const [resetOnSubmit, setResetOnSubmit] = useState(true);
 
@@ -73,8 +74,7 @@ export default function AdminScreen() {
     try {
       const d = new Date(iso);
       const date = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
-      const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-      return `${date} ${time}`;
+      return `${date}`;
     } catch { return iso || ''; }
   };
 
@@ -87,7 +87,39 @@ export default function AdminScreen() {
     } catch {
       return iso || '';
     }
-  };  
+  };
+
+  // Group snapshots by date
+  const snapshotsByDate = useMemo(() => {
+    const grouped: { [date: string]: BoardSnapshot[] } = {};
+    
+    snapshots.forEach(snapshot => {
+      const dateKey = formatEUDate(snapshot.finishedOn);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(snapshot);
+    });
+    
+    // Sort dates in descending order (most recent first)
+    return Object.entries(grouped).sort((a, b) => {
+      const dateA = new Date(a[1][0].finishedOn || '');
+      const dateB = new Date(b[1][0].finishedOn || '');
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [snapshots]);
+
+  const toggleDateFolder = (date: string) => {
+    setOpenDateFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(date)) {
+        newSet.delete(date);
+      } else {
+        newSet.add(date);
+      }
+      return newSet;
+    });
+  };
 
   const confirmFinishBoard = (board: Board) => {
     if (!isAdmin) return;
@@ -121,6 +153,67 @@ export default function AdminScreen() {
     </Card>
   );
 
+  const renderSnapshotItem = (item: BoardSnapshot) => (
+    <Swipeable
+      renderRightActions={() => (
+        <TouchableOpacity
+          onPress={async () => {
+            Alert.alert(t.admin.deleteSnapshotTitle, `${item.title} (${item.finishedOn})`, [
+              { text: t.common.cancel, style: 'cancel' },
+              { text: t.common.delete, style: 'destructive', onPress: async () => { await deleteSnapshot(item.id); await load(); } }
+            ]);
+          }}
+          style={{ justifyContent: 'center', paddingHorizontal: 16, backgroundColor: '#fee2e2', borderRadius: 8, marginVertical: 6 }}
+        >
+          <Text style={{ color: '#b91c1c', fontWeight: '700' }}>{t.common.delete}</Text>
+        </TouchableOpacity>
+      )}
+    >
+      <Card style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{item.title}</Text>
+          <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.finishedOn}: {formatDateTime(item.finishedOn)}</Text>
+          <Text style={[styles.cardSubtitle, { marginTop: 2, color: theme.colors.secondaryText }]}>{t.admin.by}: {item.submittedBy ? (profileNames[item.submittedBy] || item.submittedBy) : t.common.unknown}</Text>
+        </View>
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]} onPress={() => navigation.navigate('Snapshot', { snapshotId: item.id })}>
+          <Text style={styles.primaryBtnText}>{t.common.open}</Text>
+        </TouchableOpacity>
+      </Card>
+    </Swipeable>
+  );
+
+  const renderDateFolder = (date: string, dateSnapshots: BoardSnapshot[]) => {
+    const isOpen = openDateFolders.has(date);
+    
+    return (
+      <View key={date} style={styles.dateFolderContainer}>
+        <TouchableOpacity 
+          onPress={() => toggleDateFolder(date)} 
+          activeOpacity={0.7} 
+          style={[styles.dateFolderHeader, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={[styles.chevron, { color: theme.colors.primary, fontSize: 16 }]}>{isOpen ? '▾' : '▸'}</Text>
+            <Text style={[styles.dateFolderTitle, { color: theme.colors.text }]}>{date}</Text>
+          </View>
+          <View style={[styles.countPill, { backgroundColor: theme.colors.border }]}>
+            <Text style={[styles.countPillText, { color: theme.colors.text }]}>{dateSnapshots.length}</Text>
+          </View>
+        </TouchableOpacity>
+        
+        {isOpen && (
+          <View style={styles.dateFolderContent}>
+            {dateSnapshots.map(snapshot => (
+              <View key={snapshot.id}>
+                {renderSnapshotItem(snapshot)}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <LinearGradient colors={[theme.colors.primary, theme.colors.primaryAlt]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
@@ -148,39 +241,9 @@ export default function AdminScreen() {
         {isHistoryOpen && (snapshots.length === 0 ? (
           <View style={styles.emptyState}><Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>{t.admin.noSnapshots}</Text></View>
         ) : (
-          <FlatList
-            data={snapshots}
-            keyExtractor={(s) => s.id}
-            renderItem={({ item }) => (
-              <Swipeable
-                renderRightActions={() => (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      Alert.alert(t.admin.deleteSnapshotTitle, `${item.title} (${item.finishedOn})`, [
-                        { text: t.common.cancel, style: 'cancel' },
-                        { text: t.common.delete, style: 'destructive', onPress: async () => { await deleteSnapshot(item.id); await load(); } }
-                      ]);
-                    }}
-                    style={{ justifyContent: 'center', paddingHorizontal: 16, backgroundColor: '#fee2e2', borderRadius: 8, marginVertical: 6 }}
-                  >
-                    <Text style={{ color: '#b91c1c', fontWeight: '700' }}>{t.common.delete}</Text>
-                  </TouchableOpacity>
-                )}
-              >
-                <Card style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.cardSubtitle, { color: theme.colors.secondaryText }]}>{t.admin.finishedOn}: {formatEUDate(item.finishedOn)}</Text>
-                    <Text style={[styles.cardSubtitle, { marginTop: 2, color: theme.colors.secondaryText }]}>{t.admin.by}: {item.submittedBy ? (profileNames[item.submittedBy] || item.submittedBy) : t.common.unknown}</Text>
-                  </View>
-                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]} onPress={() => navigation.navigate('Snapshot', { snapshotId: item.id })}>
-                    <Text style={styles.primaryBtnText}>{t.common.open}</Text>
-                  </TouchableOpacity>
-                </Card>
-              </Swipeable>
-            )}
-            scrollEnabled={false} // Disable FlatList's internal scroll to allow parent ScrollView to handle it
-          />
+          <View style={styles.historyContainer}>
+            {snapshotsByDate.map(([date, dateSnapshots]) => renderDateFolder(date, dateSnapshots))}
+          </View>
         ))}
       </ScrollView>
     </SafeAreaView>
@@ -209,4 +272,17 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: 'white', fontWeight: '700' },
   dangerBtn: { backgroundColor: '#fee2e2' },
   dangerBtnText: { color: '#b91c1c', fontWeight: '700' },
+  historyContainer: { gap: 12, marginBottom: 10 },
+  dateFolderContainer: { marginBottom: 8 },
+  dateFolderHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    padding: 12, 
+    borderRadius: 12, 
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  dateFolderTitle: { fontSize: 15, fontWeight: '600' },
+  dateFolderContent: { paddingLeft: 12, gap: 4 },
 });

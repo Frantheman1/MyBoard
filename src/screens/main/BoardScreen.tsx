@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -354,6 +353,23 @@ export default function BoardScreen() {
     }
   };
 
+  const handleDeleteTaskFromModal = async () => {
+    if (!editingTaskId) return;
+    Alert.alert(t.board.deleteTaskTitle, t.board.deleteTaskMessage, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.common.delete, style: 'destructive', onPress: async () => {
+        try {
+          await deleteTask(editingTaskId);
+          setEditingTaskId(null);
+          setTaskModalColumnId(null);
+          await load();
+        } catch (e: any) {
+          Alert.alert(t.common.error, e?.message || 'Unable to delete task');
+        }
+      }}
+    ]);
+  };
+
   const handleToggleDone = async (taskId: string, done: boolean) => {
     try {
       await toggleTaskCompleted(taskId, done);
@@ -406,7 +422,12 @@ export default function BoardScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <LinearGradient colors={[theme.colors.primary, theme.colors.primaryAlt]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          style={styles.headerBack}
+          activeOpacity={0.6}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Text style={[styles.headerBackIcon, { color: 'white' }]}>←</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -431,6 +452,7 @@ export default function BoardScreen() {
               key={col.id} 
               contentContainerStyle={{ paddingBottom: 20 }} 
               showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
             >
           <View key={col.id} style={[styles.column, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <View style={styles.columnHeader}>
@@ -518,28 +540,10 @@ export default function BoardScreen() {
                 ? t.board.onlyOn + task.allowed_weekdays.map(d => t.board.days[['sun','mon','tue','wed','thu','fri','sat'][d]]).join(', ')
                 : undefined;
               return (
-                <Swipeable
-                  key={task.id}
-                  renderRightActions={() => (
-                    isAdmin ? (
-                      <TouchableOpacity
-                        onPress={() => {
-                          Alert.alert(t.board.deleteTaskTitle, t.board.deleteTaskMessage, [
-                            { text: t.common.cancel, style: 'cancel' },
-                            { text: t.common.delete, style: 'destructive', onPress: async () => { await deleteTask(task.id); await load(); } }
-                          ]);
-                        }}
-                      >
-                        <View style={styles.taskDeleteButton}>
-                          <Text style={styles.taskDeleteButtonText}>{t.common.delete}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ) : <View />
-                  )}
-                >
                 <TouchableOpacity
+                  key={task.id}
                   activeOpacity={0.8}
-                  onPress={() => { if (isAdmin) openEditTask(task); }}
+                  onPress={() => { if (isAdmin) openEditTask(task); }}  
                   style={[styles.taskCard, { backgroundColor: cardBg, opacity: allowed ? 1 : 0.5 }]}
                   disabled={!allowed && !isAdmin}
                 >
@@ -588,8 +592,8 @@ export default function BoardScreen() {
                       </Text>
                     </TouchableOpacity>
                   </View>
-                  <View style={styles.taskActionsRow}>
                   {isAdmin && (
+                    <View style={styles.taskActionsRow}>
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <TouchableOpacity
                           onPress={async () => { await reorderTaskInColumn(col.id, task.id, 'up'); await load(); }}
@@ -604,8 +608,8 @@ export default function BoardScreen() {
                           <Text style={[styles.actionBtnText, { color: theme.colors.secondaryText }]}>▼</Text>
                         </TouchableOpacity>
                       </View>
-                    )}
-                  </View>
+                    </View>
+                  )}
                   {task.completed && task.completedBy ? (
                     <View style={styles.completedInfoRow}>
                       {userProfiles[task.completedBy]?.avatar_url ? (
@@ -617,7 +621,6 @@ export default function BoardScreen() {
                     </View>
                   ) : null}
                 </TouchableOpacity>
-                </Swipeable>
               );
             })}
 
@@ -642,11 +645,6 @@ export default function BoardScreen() {
               }}>
                 <Text style={[styles.addTaskButtonText, { color: theme.colors.primary }]}>{t.board.sendColumn}</Text>
               </TouchableOpacity>
-              {lastColumnDeliveredMap[col.id] ? (
-                <Text style={{ textAlign: 'center', marginTop: 4, color: theme.colors.secondaryText, fontSize: 12 }}>
-                  {t.admin.finishedOn}: {formatISOForDisplayNO(lastColumnDeliveredMap[col.id] as string)}
-                </Text>
-              ) : null}
             </View>
           </View>
           </ScrollView>
@@ -857,26 +855,33 @@ export default function BoardScreen() {
                   </View>
                   </View>
                 ) : null}
-                {editingTaskId && isAdmin && ( // Only show move option if editing an existing task and user is admin
-                  <View style={styles.moveRow}>
-                    {columns
-                      .filter(c => c.id !== (tasks.find(t => t.id === editingTaskId)?.columnId || '')) // Filter out the current column
-                      .map(c => (
-                        <TouchableOpacity key={c.id} onPress={() => handleMoveTask(editingTaskId, c.id)}>
-                          <Text style={[styles.moveChip, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: theme.colors.secondaryText }]}>→ {c.title}</Text>
-                        </TouchableOpacity>
-                      ))}
+                {editingTaskId && isAdmin ? (
+                  <View style={{ marginTop: 12 }}>
+                    <View style={styles.moveRow}>
+                      {columns
+                        .filter(c => c.id !== (tasks.find(t => t.id === editingTaskId)?.columnId || ''))
+                        .map(c => (
+                          <TouchableOpacity key={c.id} onPress={() => handleMoveTask(editingTaskId, c.id)}>
+                            <Text style={[styles.moveChip, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: theme.colors.secondaryText }]}>→ {c.title}</Text>
+                          </TouchableOpacity>
+                        ))}
+                    </View>
                   </View>
-                )}
+                ) : null}
               </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity onPress={closeTaskModal} style={styles.modalCancel}>
                   <Text style={{ color: theme.colors.secondaryText, fontWeight: '600' }}>{t.common.cancel}</Text>
                 </TouchableOpacity>
                 {editingTaskId ? (
+                  <>
+                    <TouchableOpacity onPress={handleDeleteTaskFromModal} style={[styles.modalSave, { backgroundColor: '#ef4444' }]}>
+                      <Text style={{ color: 'white', fontWeight: '700' }}>{t.common.delete}</Text>
+                    </TouchableOpacity>
                   <TouchableOpacity onPress={handleSaveTaskEdit} style={styles.modalSave}>
                     <Text style={{ color: 'white', fontWeight: '700' }}>{t.common.save}</Text>
                   </TouchableOpacity>
+                  </>
                 ) : (
                   <TouchableOpacity onPress={handleCreateTaskAdvanced} style={styles.modalSave}>
                     <Text style={{ color: 'white', fontWeight: '700' }}>{t.common.create}</Text>

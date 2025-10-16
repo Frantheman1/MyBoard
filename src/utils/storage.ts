@@ -901,8 +901,10 @@ export async function snapshotBoardAndReset(
 
 // Ensure a board has a snapshot for a given UTC day, otherwise create it
 export async function ensureDailySnapshotForBoard(boardId: string, utcDate: string): Promise<void> {
+  // Append time to make it end of day (23:59) so it shows up as that day, not the next day
+  const dateWithTime = utcDate.includes('T') ? utcDate : `${utcDate}T23:59:00`;
   // Daily auto-send should not archive the board; pass markFinished=false
-  await snapshotBoardAndReset(boardId, utcDate, true, undefined, true, false);
+  await snapshotBoardAndReset(boardId, dateWithTime, true, undefined, true, false);
 }
 
 // Ensure all active boards in an organization have a snapshot for a given UTC day
