@@ -107,23 +107,49 @@ export default function AppNavigator() {
   // Auto-send at end of day (local day) – run once per day when app becomes active
   useEffect(() => {
     if (!user || user.role !== 'admin' || !user.organizationId) return;
-    const sub = AppState.addEventListener('change', async (state: AppStateStatus) => {
-      if (state !== 'active') return;
+
+    const checkAndSendEOD = async () => {
       try {
         const now = new Date();
         const y = now.getFullYear();
         const m = String(now.getMonth() + 1).padStart(2, '0');
         const d = String(now.getDate()).padStart(2, '0');
         const localDate = `${y}-${m}-${d}`;
+        
         if (lastRunDateRef.current === localDate) return;
+        
         // Check org settings to see if auto-send is enabled
         const { getOrganizationSettings } = await import('../utils/storage');
         const settings = await getOrganizationSettings(user.organizationId);
+        
         if (settings.autoSendEndOfDay) {
+          // Check if we need to send for previous day(s)
+          if (lastRunDateRef.current && lastRunDateRef.current < localDate) {
+            // Send for the previous day first
+            const prevDate = new Date(now);
+            prevDate.setDate(prevDate.getDate() - 1);
+            const py = prevDate.getFullYear();
+            const pm = String(prevDate.getMonth() + 1).padStart(2, '0');
+            const pd = String(prevDate.getDate()).padStart(2, '0');
+            const previousDate = `${py}-${pm}-${pd}`;
+            await ensureDailySnapshotsForOrganization(user.organizationId, previousDate);
+          }
+          // Then ensure today's is ready (in case we're doing it at end of day)
           await ensureDailySnapshotsForOrganization(user.organizationId, localDate);
         }
         lastRunDateRef.current = localDate;
-      } catch {}
+      } catch (error) {
+        console.error('[AutoSendEOD] Error:', error);
+      }
+    };
+
+    // Run check immediately on mount
+    checkAndSendEOD();
+
+    // Also run when app becomes active
+    const sub = AppState.addEventListener('change', async (state: AppStateStatus) => {
+      if (state !== 'active') return;
+      await checkAndSendEOD();
     });
     return () => sub.remove();
   }, [user?.id, user?.role, user?.organizationId]);
